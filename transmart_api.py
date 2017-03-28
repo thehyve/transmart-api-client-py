@@ -3,6 +3,9 @@
 * This code is licensed under the GNU General Public License,
 * version 3.
 * Author: Ruslan Forostianov
+
+* Modified by Laura Madrid on 08/03/2017
+* in order to make it compatible with transmart v16.2
 '''
 
 import json
@@ -59,7 +62,16 @@ class TransmartApi(object):
                 '&' + urllib.urlencode({'dataConstraints': {'genes': [{'names': genes}]}})
         hd_data = self._get_protobuf(hd_node_data_url, self._get_access_token())
         return hd_data
-    
+
+    def _get_json_post(self, url, access_token = None, hal = False):
+        headers = {}
+        headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
+        if access_token is not None:
+            headers['Authorization'] = 'Bearer ' + access_token
+	req2 = urllib2.Request(url, "", headers)
+	r2 = urllib2.urlopen(req2)
+	return json.loads(r2.read())
+
     def _get_json(self, url, access_token = None, hal = False):
         headers = {}
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
@@ -99,6 +111,6 @@ class TransmartApi(object):
             url = '%s/transmart/oauth/token' \
                   '?grant_type=password&client_id=glowingbear-js&client_secret=' \
                    '&username=%s&password=%s' % (self.host, self.user, self.password)
-            access_token_dic = self._get_json(url)
+            access_token_dic = self._get_json_post(url)
             self.access_token = access_token_dic['access_token']
         return self.access_token
