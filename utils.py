@@ -7,8 +7,8 @@
 
 import re
 import os.path
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 import collections
 
 class Entrez(object):
@@ -80,7 +80,7 @@ class Kegg(object):
         return rev
 
     def chunks(self, l, n):
-        for i in xrange(0, len(l), n):
+        for i in range(0, len(l), n):
             yield l[i:i+n]
 
     def _get_related_pathways_chunked(self, gene_ids, species_abr):
@@ -94,8 +94,8 @@ class Kegg(object):
     def _get_related_pathways(self, gene_ids, species_abr):
         gsids = [species_abr + ':' + str(gene_id) for gene_id in gene_ids]
         url = 'http://rest.kegg.jp/link/pathway/%s' % '+'.join(gsids)
-        req = urllib2.Request(url)
-        res = urllib2.urlopen(req)
+        req = urllib.request.Request(url)
+        res = urllib.request.urlopen(req)
         gene_pathway_tsv = res.read()
         return self._parse_pathway_content(gene_pathway_tsv)
     
@@ -115,5 +115,5 @@ class Uniprot(object):
     def _ensure_uniprot_file_is_present(self, uniprot_entrez_kegg_file):
         if not os.path.isfile(uniprot_entrez_kegg_file):
             url = 'http://www.uniprot.org/uniprot/?sort=score&desc=&compress=no&query=homo%20sapiens&fil=&force=no&format=tab&columns=id,genes,database(KEGG)'
-            urllib.urlretrieve (url, uniprot_entrez_kegg_file)
+            urllib.request.urlretrieve (url, uniprot_entrez_kegg_file)
         return uniprot_entrez_kegg_file

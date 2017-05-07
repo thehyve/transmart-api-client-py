@@ -9,8 +9,8 @@
 '''
 
 import json
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 from highdim_pb2 import HighDimHeader
 from highdim_pb2 import Row
 from google.protobuf import text_format
@@ -28,7 +28,7 @@ class TransmartApi(object):
         try:
             self._get_access_token()
             return 'SUCCESS'
-        except urllib2.HTTPError:
+        except urllib.error.HTTPError:
             return 'ERROR'
 
     def get_observations(self, study, hal = False):
@@ -59,7 +59,7 @@ class TransmartApi(object):
         hd_node_data_url = '%s?projection=%s&dataType=%s' % (hd_node_url, projection, hd_data_type_name)
         if genes is not None:
             hd_node_data_url = hd_node_data_url + \
-                '&' + urllib.urlencode({'dataConstraints': {'genes': [{'names': genes}]}})
+                '&' + urllib.parse.urlencode({'dataConstraints': {'genes': [{'names': genes}]}})
         hd_data = self._get_protobuf(hd_node_data_url, self._get_access_token())
         return hd_data
 
@@ -68,8 +68,8 @@ class TransmartApi(object):
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
         if access_token is not None:
             headers['Authorization'] = 'Bearer ' + access_token
-        req2 = urllib2.Request(url, "", headers)
-        r2 = urllib2.urlopen(req2)
+        req2 = urllib.request.Request(url, "", headers)
+        r2 = urllib.request.urlopen(req2)
         return json.loads(r2.read())
 
     def _get_json(self, url, access_token = None, hal = False):
@@ -77,8 +77,8 @@ class TransmartApi(object):
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
         if access_token is not None:
             headers['Authorization'] = 'Bearer ' + access_token
-        req = urllib2.Request(url, headers = headers)
-        res = urllib2.urlopen(req)
+        req = urllib.request.Request(url, headers = headers)
+        res = urllib.request.urlopen(req)
         return json.loads(res.read())
 
     def _parse_protobuf(self, data):
@@ -103,8 +103,8 @@ class TransmartApi(object):
         }
         if access_token is not None:
             headers['Authorization'] = 'Bearer ' + access_token
-        req = urllib2.Request(url, headers = headers)
-        return self._parse_protobuf(urllib2.urlopen(req).read())
+        req = urllib.request.Request(url, headers = headers)
+        return self._parse_protobuf(urllib.request.urlopen(req).read())
 
     def _get_access_token(self):
         if self.access_token is None:
