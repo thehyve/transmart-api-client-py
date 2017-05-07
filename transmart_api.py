@@ -17,7 +17,7 @@ from google.protobuf import text_format
 import google.protobuf.internal.decoder as decoder
 #change from guest
 class TransmartApi(object):
-    
+
     def __init__(self, host, user, password):
         self.host = host
         self.user = user
@@ -30,7 +30,7 @@ class TransmartApi(object):
             return 'SUCCESS'
         except urllib2.HTTPError:
             return 'ERROR'
-    
+
     def get_observations(self, study, hal = False):
         url = '%s/transmart/studies/%s/observations' % (self.host, study)
         observations = self._get_json(url, self._get_access_token(), hal = hal)
@@ -39,12 +39,12 @@ class TransmartApi(object):
     def get_concepts(self, study, hal = False):
         url = '%s/transmart/studies/%s/concepts/' % (self.host, study)
         return self._get_json(url, self._get_access_token(), hal = hal)
-        
+
     def get_hd_node_data(self, study, node_name, projection='all_data', genes = None):
         """
         Parameters
         ----------
-        node_name: string 
+        node_name: string
            Name of the leaf node
         projection : string
            Possible values: default_real_projection, zscore, log_intensity, all_data (default)
@@ -68,9 +68,9 @@ class TransmartApi(object):
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
         if access_token is not None:
             headers['Authorization'] = 'Bearer ' + access_token
-	req2 = urllib2.Request(url, "", headers)
-	r2 = urllib2.urlopen(req2)
-	return json.loads(r2.read())
+        req2 = urllib2.Request(url, "", headers)
+        r2 = urllib2.urlopen(req2)
+        return json.loads(r2.read())
 
     def _get_json(self, url, access_token = None, hal = False):
         headers = {}
@@ -80,11 +80,11 @@ class TransmartApi(object):
         req = urllib2.Request(url, headers = headers)
         res = urllib2.urlopen(req)
         return json.loads(res.read())
-    
+
     def _parse_protobuf(self, data):
         hdHeader = HighDimHeader()
         (length, start) = decoder._DecodeVarint(data, 0)
-        hdHeader.ParseFromString(data[start:start+length])     
+        hdHeader.ParseFromString(data[start:start+length])
         data = data[start+length:]
         hdRows = []
         n = len(data)
@@ -96,7 +96,7 @@ class TransmartApi(object):
             hdRows.append(hdRow)
             start += length
         return (hdHeader, hdRows)
-        
+
     def _get_protobuf(self, url, access_token = None):
         headers = {
             'Accept': 'application/octet-stream'
@@ -105,7 +105,7 @@ class TransmartApi(object):
             headers['Authorization'] = 'Bearer ' + access_token
         req = urllib2.Request(url, headers = headers)
         return self._parse_protobuf(urllib2.urlopen(req).read())
-        
+
     def _get_access_token(self):
         if self.access_token is None:
             url = '%s/transmart/oauth/token' \
