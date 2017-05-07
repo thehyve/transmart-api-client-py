@@ -79,7 +79,7 @@ class TransmartApi(object):
             headers['Authorization'] = 'Bearer ' + access_token
         req = urllib.request.Request(url, headers = headers)
         res = urllib.request.urlopen(req)
-        return json.loads(res.read())
+        return json.loads(res.read().decode('utf-8'))
 
     def _parse_protobuf(self, data):
         hdHeader = HighDimHeader()
