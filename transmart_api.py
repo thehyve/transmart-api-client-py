@@ -68,9 +68,9 @@ class TransmartApi(object):
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
         if access_token is not None:
             headers['Authorization'] = 'Bearer ' + access_token
-        req2 = urllib.request.Request(url, "", headers)
+        req2 = urllib.request.Request(url=url, data=b'', headers=headers)
         r2 = urllib.request.urlopen(req2)
-        return json.loads(r2.read())
+        return json.loads(r2.read().decode('utf-8'))
 
     def _get_json(self, url, access_token = None, hal = False):
         headers = {}
