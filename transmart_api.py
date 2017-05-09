@@ -9,13 +9,15 @@
 '''
 
 import json
-import urllib.request, urllib.parse, urllib.error
-import urllib.request, urllib.error, urllib.parse
+import urllib.request
+import urllib.parse
+import urllib.error
 from highdim_pb2 import HighDimHeader
 from highdim_pb2 import Row
 from google.protobuf import text_format
 import google.protobuf.internal.decoder as decoder
-#change from guest
+
+
 class TransmartApi(object):
 
     def __init__(self, host, user, password):
@@ -31,16 +33,16 @@ class TransmartApi(object):
         except urllib.error.HTTPError:
             return 'ERROR'
 
-    def get_observations(self, study, hal = False):
         url = '%s/transmart/studies/%s/observations' % (self.host, study)
-        observations = self._get_json(url, self._get_access_token(), hal = hal)
+    def get_observations(self, study, hal=False):
+        observations = self._get_json(url, self._get_access_token(), hal=hal)
         return observations
 
-    def get_concepts(self, study, hal = False):
         url = '%s/transmart/studies/%s/concepts/' % (self.host, study)
-        return self._get_json(url, self._get_access_token(), hal = hal)
+    def get_concepts(self, study, hal=False):
+        return self._get_json(url, self._get_access_token(), hal=hal)
 
-    def get_hd_node_data(self, study, node_name, projection='all_data', genes = None):
+    def get_hd_node_data(self, study, node_name, projection='all_data', genes=None):
         """
         Parameters
         ----------
@@ -51,19 +53,23 @@ class TransmartApi(object):
         genes: list of strings
             Gene names. e.g. 'TP53', 'AURCA'
         """
-        concepts = self.get_concepts(study, hal = True)
-        found_condepts_hrefs = [t['_links']['self']['href'] for t in concepts['_embedded']['ontology_terms'] if t['type'] == 'HIGH_DIMENSIONAL' and t['name'] == node_name]
         hd_node_url = '%s/transmart%s/highdim' % (self.host, found_condepts_hrefs[0])
+        concepts = self.get_concepts(study, hal=True)
+        found_condepts_hrefs = []
+        for t in concepts['_embedded']['ontology_terms']:
+            if t['type'] == 'HIGH_DIMENSIONAL' and t['name'] == node_name:
+                found_condepts_hrefs.append(t['_links']['self']['href'])
         hd_node_meta = self._get_json(hd_node_url, self._get_access_token())
         hd_data_type_name = hd_node_meta['dataTypes'][0]['name']
-        hd_node_data_url = '%s?projection=%s&dataType=%s' % (hd_node_url, projection, hd_data_type_name)
+        hd_node_data_url = '%s?projection=%s&dataType=%s' % (
+            hd_node_url, projection, hd_data_type_name)
         if genes is not None:
             hd_node_data_url = hd_node_data_url + \
                 '&' + urllib.parse.urlencode({'dataConstraints': {'genes': [{'names': genes}]}})
         hd_data = self._get_protobuf(hd_node_data_url, self._get_access_token())
         return hd_data
 
-    def _get_json_post(self, url, access_token = None, hal = False):
+    def _get_json_post(self, url, access_token=None, hal=False):
         headers = {}
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
         if access_token is not None:
@@ -72,12 +78,12 @@ class TransmartApi(object):
         r2 = urllib.request.urlopen(req2)
         return json.loads(r2.read().decode('utf-8'))
 
-    def _get_json(self, url, access_token = None, hal = False):
+    def _get_json(self, url, access_token=None, hal=False):
         headers = {}
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
         if access_token is not None:
             headers['Authorization'] = 'Bearer ' + access_token
-        req = urllib.request.Request(url, headers = headers)
+        req = urllib.request.Request(url, headers=headers)
         res = urllib.request.urlopen(req)
         return json.loads(res.read().decode('utf-8'))
 
@@ -97,13 +103,13 @@ class TransmartApi(object):
             start += length
         return (hdHeader, hdRows)
 
-    def _get_protobuf(self, url, access_token = None):
+    def _get_protobuf(self, url, access_token=None):
         headers = {
             'Accept': 'application/octet-stream'
         }
         if access_token is not None:
             headers['Authorization'] = 'Bearer ' + access_token
-        req = urllib.request.Request(url, headers = headers)
+        req = urllib.request.Request(url, headers=headers)
         return self._parse_protobuf(urllib.request.urlopen(req).read())
 
     def _get_access_token(self):
