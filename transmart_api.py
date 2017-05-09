@@ -20,10 +20,14 @@ import google.protobuf.internal.decoder as decoder
 
 class TransmartApi(object):
 
-    def __init__(self, host, user, password):
+    def __init__(self, host, user, password, apiversion):
         self.host = host
         self.user = user
         self.password = password
+        if apiversion in [1, 2]:
+            self.apiversion = apiversion
+        else:
+            raise ValueError("Not a valid TranSMART API version")
         self.access_token = None
 
     def access(self):
@@ -33,13 +37,17 @@ class TransmartApi(object):
         except urllib.error.HTTPError:
             return 'ERROR'
 
-        url = '%s/transmart/studies/%s/observations' % (self.host, study)
     def get_observations(self, study, hal=False):
+        if self.apiversion == 1:
+            url = '%s/studies/%s/observations' % (self.host, study)
+        elif self.apiversion == 2:
+            url = '%s/v2/observations?constraint={"type":"StudyNameConstraint","studyId":"%s"}'\
+                % (self.host, study)
         observations = self._get_json(url, self._get_access_token(), hal=hal)
         return observations
 
-        url = '%s/transmart/studies/%s/concepts/' % (self.host, study)
     def get_concepts(self, study, hal=False):
+        url = '%s/studies/%s/concepts/' % (self.host, study)
         return self._get_json(url, self._get_access_token(), hal=hal)
 
     def get_hd_node_data(self, study, node_name, projection='all_data', genes=None):
@@ -53,12 +61,12 @@ class TransmartApi(object):
         genes: list of strings
             Gene names. e.g. 'TP53', 'AURCA'
         """
-        hd_node_url = '%s/transmart%s/highdim' % (self.host, found_condepts_hrefs[0])
         concepts = self.get_concepts(study, hal=True)
         found_condepts_hrefs = []
         for t in concepts['_embedded']['ontology_terms']:
             if t['type'] == 'HIGH_DIMENSIONAL' and t['name'] == node_name:
                 found_condepts_hrefs.append(t['_links']['self']['href'])
+        hd_node_url = '%s%s/highdim' % (self.host, found_condepts_hrefs[0])
         hd_node_meta = self._get_json(hd_node_url, self._get_access_token())
         hd_data_type_name = hd_node_meta['dataTypes'][0]['name']
         hd_node_data_url = '%s?projection=%s&dataType=%s' % (
@@ -114,7 +122,7 @@ class TransmartApi(object):
 
     def _get_access_token(self):
         if self.access_token is None:
-            url = '%s/transmart/oauth/token' \
+            url = '%s/oauth/token' \
                   '?grant_type=password&client_id=glowingbear-js&client_secret=' \
                    '&username=%s&password=%s' % (self.host, self.user, self.password)
             access_token_dic = self._get_json_post(url)
