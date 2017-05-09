@@ -21,34 +21,81 @@ import google.protobuf.internal.decoder as decoder
 class TransmartApi(object):
 
     def __init__(self, host, user, password, apiversion):
+        apiversions = [1, 2]
+
         self.host = host
         self.user = user
         self.password = password
-        if apiversion in [1, 2]:
+        if apiversion in apiversions:
             self.apiversion = apiversion
         else:
-            raise ValueError("Not a valid TranSMART API version")
+            raise ValueError("Not a valid TranSMART API version. Choose from: "+str(apiversions))
         self.access_token = None
 
     def access(self):
         try:
             self._get_access_token()
-            return 'SUCCESS'
-        except urllib.error.HTTPError:
-            return 'ERROR'
+            return 'Connected successfully'
+        except urllib.error.HTTPError as error:
+            return "ERROR: " + format(error)
 
-    def get_observations(self, study, hal=False):
+    def get_observations(self, study=None, patientSet=None, hal=False):
         if self.apiversion == 1:
             url = '%s/studies/%s/observations' % (self.host, study)
         elif self.apiversion == 2:
-            url = ('%s/v2/observations?constraint={"type":"study_name","studyId":"%s"}'
-                   '&type=clinical') % (self.host, study)
-            print(url)
+            url = ('%s/v2/observations') % (self.host)
+            url += '?type=clinical'
+            constraint = self.build_constraint(study=study, patientSet=patientSet)
+            if constraint:
+                url += '&'+constraint
+
+        print(url)
         observations = self._get_json(url, self._get_access_token(), hal=hal)
         return observations
 
+    # TODO Create formatting function for V2 observations
+
+    def get_patients(self, study=None, patientSet=None, hal=False):
+        if self.apiversion == 1:
+            raise ValueError("Function not implemented in Python client for API V1")
+        elif self.apiversion == 2:
+            url = ('%s/v2/patients') % (self.host)
+            constraint = self.build_constraint(study=study, patientSet=patientSet)
+            if constraint:
+                url += '?'+constraint
+
+        print(url)
+        studies = self._get_json(url, self._get_access_token(), hal=hal)
+        return studies
+
+    def build_constraint(self, study=None, patientSet=None):
+        constraint = ''
+
+        if study:
+            constraint += '{"type":"study_name","studyId":"%s"}' % (study)
+        if patientSet:
+            constraint += '{"type":"patient_set","patientSetId":%s}' % (patientSet)
+
+        if constraint != '':
+            return 'constraint='+constraint
+        else:
+            return None
+
+    def get_studies(self, hal=False):
+        if self.apiversion == 1:
+            url = '%s/studies' % (self.host)
+        elif self.apiversion == 2:
+            url = ('%s/v2/studies') % (self.host)
+        print(url)
+        studies = self._get_json(url, self._get_access_token(), hal=hal)
+        return studies
+
     def get_concepts(self, study, hal=False):
-        url = '%s/studies/%s/concepts/' % (self.host, study)
+        if self.apiversion == 1:
+            url = '%s/studies/%s/concepts/' % (self.host, study)
+        elif self.apiversion == 2:
+            raise ValueError("Call not available for API V2")
+        print(url)
         return self._get_json(url, self._get_access_token(), hal=hal)
 
     def get_hd_node_data(self, study, node_name, projection='all_data', genes=None):
@@ -62,6 +109,10 @@ class TransmartApi(object):
         genes: list of strings
             Gene names. e.g. 'TP53', 'AURCA'
         """
+        if self.apiversion == 2:
+            raise ValueError("Function not yet implemented in Python client for API V2")
+            # TODO Create V2 version for highdimensional data
+
         concepts = self.get_concepts(study, hal=True)
         found_condepts_hrefs = []
         for t in concepts['_embedded']['ontology_terms']:
