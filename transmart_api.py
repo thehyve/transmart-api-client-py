@@ -41,8 +41,9 @@ class TransmartApi(object):
         if self.apiversion == 1:
             url = '%s/studies/%s/observations' % (self.host, study)
         elif self.apiversion == 2:
-            url = '%s/v2/observations?constraint={"type":"StudyNameConstraint","studyId":"%s"}'\
-                % (self.host, study)
+            url = ('%s/v2/observations?constraint={"type":"study_name","studyId":"%s"}'
+                   '&type=clinical') % (self.host, study)
+            print(url)
         observations = self._get_json(url, self._get_access_token(), hal=hal)
         return observations
 
