@@ -1,2 +1,9 @@
 .ipynb_checkpoints
 *.pyc
+.idea/
+*.ipynb
+__pycache__/
+build/
+dist/
+transmart.egg-info/
+transmart/__pycache__/
