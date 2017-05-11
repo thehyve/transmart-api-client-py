@@ -46,7 +46,7 @@ class TransmartApi(object):
         elif self.apiversion == 2:
             url = ('%s/v2/observations') % (self.host)
             url += '?type=clinical'
-            constraint = self.build_constraint(study=study, patientSet=patientSet)
+            constraint = self._build_constraint(study=study, patientSet=patientSet)
             if constraint:
                 url += '&'+constraint
 
@@ -61,7 +61,7 @@ class TransmartApi(object):
             raise ValueError("Function not implemented in Python client for API V1")
         elif self.apiversion == 2:
             url = ('%s/v2/patients') % (self.host)
-            constraint = self.build_constraint(study=study, patientSet=patientSet)
+            constraint = self._build_constraint(study=study, patientSet=patientSet)
             if constraint:
                 url += '?'+constraint
 
@@ -69,7 +69,7 @@ class TransmartApi(object):
         studies = self._get_json(url, self._get_access_token(), hal=hal)
         return studies
 
-    def build_constraint(self, study=None, patientSet=None):
+    def _build_constraint(self, study=None, patientSet=None):
         constraint = ''
 
         if study:
