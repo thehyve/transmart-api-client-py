@@ -54,7 +54,41 @@ class TransmartApi(object):
         observations = self._get_json(url, self._get_access_token(), hal=hal)
         return observations
 
-    # TODO Create formatting function for V2 observations
+    def format_observations(self, observations_result):
+        output_cells = []
+        indexed_dimensions = []
+        inline_dimensions = []
+
+        for dimension in observations_result['dimensionDeclarations']:
+            if 'inline' in dimension:
+                inline_dimensions.append(dimension)
+            else:
+                indexed_dimensions.append(dimension)
+
+        for dimension in indexed_dimensions:
+            dimension['values'] = observations_result['dimensionElements'][dimension['name']]
+
+        for cell in observations_result['cells']:
+            output_cell = {}
+
+            i = 0
+            for index in cell['dimensionIndexes']:
+                if index is not None:
+                    output_cell[indexed_dimensions[i]['name']] = \
+                        indexed_dimensions[i]['values'][int(index)]
+                i += 1
+
+            i = 0
+            for index in cell['inlineDimensions']:
+                output_cell[inline_dimensions[i]['name']] = index
+                i += 1
+
+            if 'stringValue' in cell:
+                output_cell['stringValue'] = cell['stringValue']
+            if 'numericValue' in cell:
+                output_cell['numericValue'] = cell['numericValue']
+            output_cells.append(output_cell)
+        return output_cells
 
     def get_patients(self, study=None, patientSet=None, hal=False):
         if self.apiversion == 1:
