@@ -1,8 +1,8 @@
 '''
-* Copyright (c) 2015 The Hyve B.V.
+* Copyright (c) 2015-2017 The Hyve B.V.
 * This code is licensed under the GNU General Public License,
 * version 3.
-* Author: Ruslan Forostianov
+* Author: Ruslan Forostianov, Ward Weistra
 
 * Modified by Laura Madrid on 08/03/2017
 * in order to make it compatible with transmart v16.2
