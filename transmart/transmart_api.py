@@ -1,36 +1,56 @@
-'''
+"""
 * Copyright (c) 2015-2017 The Hyve B.V.
 * This code is licensed under the GNU General Public License,
 * version 3.
-* Author: Ruslan Forostianov, Ward Weistra
+* Original Author: Ruslan Forostianov
+
+* Contributors:
+    - Jochem Bijlard
+    - Laura Madrid
+    - Ward Weistra
 
 * Modified by Laura Madrid on 08/03/2017
 * in order to make it compatible with transmart v16.2
-'''
+"""
 
 import json
 import urllib.error
 import urllib.parse
 import urllib.request
+import getpass
 
 import google.protobuf.internal.decoder as decoder
+from pandas.io.json import json_normalize
 
 from transmart.highdim_pb2 import HighDimHeader
 from transmart.highdim_pb2 import Row
 
 
 class TransmartApi(object):
+    """ Connect to tranSMART using Python. """
 
-    def __init__(self, host, user, password, apiversion):
-        apiversions = [1, 2]
+    def __init__(self, host, user=None, password=None, api_version=2, print_urls=False):
+        """
+        Create the python transmart client by providing user credentials.
+
+        :param host: a transmart URL (e.g. http://transmart-test.thehyve.net)
+        :param user: if not given, it asks for it.
+        :param password: if not given, it asks for it.
+        :param api_version: either 1 or 2. Default is 2.
+        :param print_urls: print the url of handles being used.
+        """
+        api_versions = (1, 2)
 
         self.host = host
-        self.user = user
-        self.password = password
-        if apiversion in apiversions:
-            self.apiversion = apiversion
+        self.user = user or input("Username: ")
+        self.password = password or getpass.getpass("Password: ")
+        self.print_urls = print_urls
+
+        if api_version in api_versions:
+            self._is_v2 = api_version == 2
         else:
-            raise ValueError("Not a valid TranSMART API version. Choose from: "+str(apiversions))
+            raise ValueError("Not a valid TranSMART API version. Choose from: "+str(api_versions))
+
         self.access_token = None
 
     def access(self):
@@ -40,21 +60,37 @@ class TransmartApi(object):
         except urllib.error.HTTPError as error:
             return "ERROR: " + format(error)
 
-    def get_observations(self, study=None, patientSet=None, hal=False):
-        if self.apiversion == 1:
-            url = '%s/studies/%s/observations' % (self.host, study)
-        elif self.apiversion == 2:
+    def get_observations(self, study=None, patientSet=None, as_dataframe=True, hal=False):
+        """
+        Get observations, from the main table in the transmart data model.
+
+        :param study: studyID
+        :param patientSet: patient set id
+        :param as_dataframe: If True (default), convert json response to dataframe
+        :param hal: ?
+        :return: dataframe or direct json
+        """
+        if self._is_v2:
             url = ('%s/v2/observations') % (self.host)
             url += '?type=clinical'
             constraint = self._build_constraint(study=study, patientSet=patientSet)
             if constraint:
                 url += '&'+constraint
+        else:
+            url = '%s/studies/%s/observations' % (self.host, study)
 
-        print(url)
         observations = self._get_json(url, self._get_access_token(), hal=hal)
+
+        if as_dataframe:
+            if self._is_v2:
+                observations = self._format_observations(observations)
+
+            observations = json_normalize(observations)
+
         return observations
 
-    def format_observations(self, observations_result):
+    @staticmethod
+    def _format_observations(observations_result):
         output_cells = []
         indexed_dimensions = []
         inline_dimensions = []
@@ -90,18 +126,28 @@ class TransmartApi(object):
             output_cells.append(output_cell)
         return output_cells
 
-    def get_patients(self, study=None, patientSet=None, hal=False):
-        if self.apiversion == 1:
-            raise ValueError("Function not implemented in Python client for API V1")
-        elif self.apiversion == 2:
+    def get_patients(self, study=None, patientSet=None, as_dataframe=True, hal=False):
+        """
+        Get patients.
+
+        :param study: studyID
+        :param patientSet: patient set id
+        :param as_dataframe: If True (default), convert json response to dataframe
+        :param hal: ?
+        :return: dataframe or direct json
+        """
+        if self._is_v2:
             url = ('%s/v2/patients') % (self.host)
             constraint = self._build_constraint(study=study, patientSet=patientSet)
             if constraint:
                 url += '?'+constraint
+        else:
+            raise ValueError("Function not implemented in Python client for API V1")
 
-        print(url)
-        studies = self._get_json(url, self._get_access_token(), hal=hal)
-        return studies
+        patients = self._get_json(url, self._get_access_token(), hal=hal)
+        if as_dataframe:
+            patients = json_normalize(patients['patients'])
+        return patients
 
     def _build_constraint(self, study=None, patientSet=None):
         constraint = ''
@@ -116,21 +162,31 @@ class TransmartApi(object):
         else:
             return None
 
-    def get_studies(self, hal=False):
-        if self.apiversion == 1:
-            url = '%s/studies' % (self.host)
-        elif self.apiversion == 2:
+    def get_studies(self, as_dataframe=True, hal=False):
+        """
+        Get all studies.
+
+        :param as_dataframe: If True (default), convert json response to dataframe
+        :param hal: ?
+        :return: dataframe or direct json
+        """
+        if self._is_v2:
             url = ('%s/v2/studies') % (self.host)
-        print(url)
+        else:
+            url = '%s/studies' % (self.host)
+
         studies = self._get_json(url, self._get_access_token(), hal=hal)
+
+        if as_dataframe:
+            studies = json_normalize(studies['studies'])
+
         return studies
 
     def get_concepts(self, study, hal=False):
-        if self.apiversion == 1:
+        if self._is_v2:
+            raise NotImplementedError("Call not available for API V2")
+        else:
             url = '%s/studies/%s/concepts/' % (self.host, study)
-        elif self.apiversion == 2:
-            raise ValueError("Call not available for API V2")
-        print(url)
         return self._get_json(url, self._get_access_token(), hal=hal)
 
     def get_hd_node_data(self, study, node_name, projection='all_data', genes=None):
@@ -144,8 +200,8 @@ class TransmartApi(object):
         genes: list of strings
             Gene names. e.g. 'TP53', 'AURCA'
         """
-        if self.apiversion == 2:
-            raise ValueError("Function not yet implemented in Python client for API V2")
+        if self._is_v2:
+            raise NotImplementedError("Function not yet implemented in Python client for API V2")
             # TODO Create V2 version for highdimensional data
 
         concepts = self.get_concepts(study, hal=True)
@@ -165,6 +221,10 @@ class TransmartApi(object):
         return hd_data
 
     def _get_json_post(self, url, access_token=None, hal=False):
+
+        if self.print_urls:
+            print(url)
+
         headers = {}
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
         if access_token is not None:
@@ -174,6 +234,10 @@ class TransmartApi(object):
         return json.loads(r2.read().decode('utf-8'))
 
     def _get_json(self, url, access_token=None, hal=False):
+
+        if self.print_urls:
+            print(url)
+
         headers = {}
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
         if access_token is not None:
