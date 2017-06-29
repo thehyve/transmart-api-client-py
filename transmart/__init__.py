@@ -1,7 +1,6 @@
 """tmtk - A toolkit for ETL curation for the tranSMART data warehouse."""
 
-from .transmart_api import TransmartApi
-from . import utils
+from .main import get_api
 
 __version__ = "0.1.3"
 __author__ = 'The Hyve'
