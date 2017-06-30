@@ -31,16 +31,16 @@ class TransmartAPIBase:
 
         return r.json().get('access_token')
 
-    def get_observations(self, study=None, patientSet=None, as_dataframe=True, hal=False):
+    def get_observations(self, study=None, patientSet=None, as_dataframe=True):
         raise NotImplementedError
 
-    def get_patients(self, study=None, patientSet=None, as_dataframe=True, hal=False):
+    def get_patients(self, study=None, patientSet=None, as_dataframe=True):
         raise NotImplementedError
 
-    def get_studies(self, as_dataframe=True, hal=False):
+    def get_studies(self, as_dataframe=True):
         raise NotImplementedError
 
-    def get_concepts(self, study, hal=False):
+    def get_concepts(self, study):
         raise NotImplementedError
 
     def get_hd_node_data(self, study, node_name, projection='all_data', genes=None):

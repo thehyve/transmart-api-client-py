@@ -10,7 +10,7 @@ from pandas.io.json import json_normalize
 
 from ..tm_api_base import TransmartAPIBase
 from .query import Query
-from .data_structures import ObservationSet
+from .data_structures import ObservationSet, ObservationSetHD, TreeNodes, PatientSets, Studies, StudyList
 
 
 class TransmartV2(TransmartAPIBase):
@@ -26,86 +26,10 @@ class TransmartV2(TransmartAPIBase):
         :param print_urls: print the url of handles being used.
         """
         super().__init__(host, user, password, print_urls)
-
-    def get_observations(self, study=None, patient_set=None, as_dataframe=True, hal=False):
-        """
-        Get observations, from the main table in the transmart data model.
-
-        :param study: studyID
-        :param patient_set: patient set id
-        :param as_dataframe: If True (default), convert json response to dataframe
-        :param hal: ?
-        :return: dataframe or direct json
-        """
-
-        q = Query(handle='/v2/observations',
-                  params={'type': 'clinical'},
-                  in_study=study,
-                  in_patientset=patient_set,
-                  hal=hal)
-
-        observations = ObservationSet(self.query(q))
-
-        if as_dataframe:
-            return observations.dataframe
-
-        return observations
-
-    def get_patients(self, study=None, patient_set=None, as_dataframe=True, hal=False):
-        """
-        Get patients.
-
-        :param study: studyID
-        :param patient_set: patient set id
-        :param as_dataframe: If True (default), convert json response to dataframe
-        :param hal: ?
-        :return: dataframe or direct json
-        """
-        q = Query(handle='/v2/patients', in_study=study, in_patientset=patient_set, hal=hal)
-
-        patients = self.query(q)
-
-        if as_dataframe:
-            patients = json_normalize(patients['patients'])
-        return patients
-
-    def get_studies(self, as_dataframe=True, hal=False):
-        """
-        Get all studies.
-
-        :param as_dataframe: If True (default), convert json response to dataframe
-        :param hal: ?
-        :return: dataframe or direct json
-        """
-
-        q = Query(handle='/v2/studies', hal=hal)
-
-        studies = self.query(q)
-
-        if as_dataframe:
-            studies = json_normalize(studies['studies'])
-
-        return studies
-
-    def get_concepts(self, study, hal=False):
-        raise NotImplementedError("Call not available for API V2.")
-
-    def get_hd_node_data(self, study, node_name, projection='all_data', genes=None):
-        """
-        Parameters
-        ----------
-        node_name: string
-           Name of the leaf node
-        projection : string
-           Possible values: default_real_projection, zscore, log_intensity, all_data (default)
-        genes: list of strings
-            Gene names. e.g. 'TP53', 'AURCA'
-        """
-        raise NotImplementedError("Function not yet implemented in Python client for API V2")
-        # TODO Create V2 version for highdimensional data
+        self.studies = None
 
     def query(self, q):
-        """ Perform query using API client """
+        """ Perform query using API client using a Query object """
 
         url = "{}{}".format(self.host, q.handle)
         if self.print_urls:
@@ -114,5 +38,118 @@ class TransmartV2(TransmartAPIBase):
         headers = q.headers
         headers['Authorization'] = 'Bearer ' + self.access_token
 
-        r = getattr(requests, q.method.lower())(url, params=q.params, headers=headers)
+        if q.method.upper() == 'GET':
+            r = requests.get(url, params=q.params, headers=headers)
+        else:
+            r = requests.post(url, json=q.params, headers=headers)
+
         return r.json()
+
+    def get_observations(self, study=None, patient_set=None, as_dataframe=False):
+        """
+        Get observations, from the main table in the transmart data model.
+
+        :param study: studyID
+        :param patient_set: patient set id
+        :param as_dataframe: If True, convert json response to dataframe directly
+        :return: dataframe or ObservationSet object
+        """
+
+        q = Query(handle='/v2/observations',
+                  params={'type': 'clinical'},
+                  in_study=study,
+                  in_patientset=patient_set)
+
+        observations = ObservationSet(self.query(q))
+
+        if as_dataframe:
+            return observations.dataframe
+
+        return observations
+
+    def get_patients(self, study=None, patient_set=None, as_dataframe=False):
+        """
+        Get patients.
+
+        :param study: studyID
+        :param patient_set: patient set id
+        :param as_dataframe: If True, convert json response to dataframe directly
+        :return: dataframe or direct json
+        """
+        q = Query(handle='/v2/patients', in_study=study, in_patientset=patient_set)
+
+        patients = self.query(q)
+
+        if as_dataframe:
+            patients = json_normalize(patients['patients'])
+        return patients
+
+    def get_studies(self, as_dataframe=False):
+        """
+        Get all studies.
+
+        :param as_dataframe: If True, convert json response to dataframe
+        :return: dataframe or Studies object
+        """
+
+        q = Query(handle='/v2/studies')
+
+        studies = Studies(self.query(q))
+
+        self.studies = StudyList(studies.dataframe.studyId)
+
+        if as_dataframe:
+            studies = studies.dataframe
+
+        return studies
+
+    def get_concepts(self, study, hal=False):
+        raise NotImplementedError("Call not available for API V2.")
+
+    def tree_nodes(self, root=None, depth=0, counts=True, tags=True, hal=False):
+        """
+
+        :param root:
+        :param depth:
+        :param counts:
+        :param tags:
+        :param hal:
+        :return:
+        """
+        q = Query(handle='/v2/tree_nodes',
+                  params={'root': root,
+                          'depth': depth,
+                          'counts': counts,
+                          'tags': tags},
+                  hal=hal)
+
+        return TreeNodes(self.query(q))
+
+    def get_patient_sets(self):
+        q = Query(handle='/v2/patient_sets')
+        return PatientSets(self.query(q))
+
+    def get_hd_node_data(self, study, hd_type='autodetect', genes=None, transcripts=None, concept=None,
+                         patient_set=None, projection='all_data'):
+        """
+
+        :param study:
+        :param hd_type:
+        :param genes:
+        :param transcripts:
+        :param concept:
+        :param patient_set:
+        :param projection: ['all_data', 'zscore', 'log_intensity']
+        :return:
+        """
+        q = Query(handle='/v2/observations',
+                  method='POST',
+                  params={'type': hd_type,
+                          'projection': projection},
+                  in_study=study,
+                  in_patientset=patient_set,
+                  in_concept=concept,
+                  in_gene_list=genes,
+                  in_transcript_list=transcripts
+                  )
+        return ObservationSetHD(self.query(q))
