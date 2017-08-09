@@ -12,10 +12,11 @@ class Query:
 
     def __init__(self, handle=None, method='GET', params=None, hal=False,
                  in_study=None, in_patientset=None, in_concept=None, in_gene_list=None,
-                 in_transcript_list=None):
+                 in_transcript_list=None, protobuf=False):
         self.handle = handle
         self.method = method
         self.hal = hal
+        self.protobuf = protobuf
         self._params = params or {}
 
         # Subject constraints
@@ -39,7 +40,7 @@ class Query:
 
     @property
     def headers(self):
-        return {'Accept': 'application/{};charset=UTF-8'.format('hal+json' if self.hal else 'json')}
+        return {'Accept': 'application/{}'.format('x-protobuf' if self.protobuf else 'json;charset=UTF-8')}
 
     def get_constraints(self):
         constraints = ''.join([str(c) for c in (self.in_study, self.in_patientset, self.in_concept) if c.value])

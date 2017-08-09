@@ -5,6 +5,8 @@
 """
 
 import requests
+import google.protobuf.internal.decoder as decoder
+from .protobuf import observations_pb2 as pb
 
 from pandas.io.json import json_normalize
 
@@ -43,7 +45,28 @@ class TransmartV2(TransmartAPIBase):
         else:
             r = requests.post(url, json=q.params, headers=headers)
 
+        if q.protobuf:
+            return r
+            # return self._parse_protobuf(r.content)
+
         return r.json()
+
+    @staticmethod
+    def _parse_protobuf(data):
+        hdHeader = pb.Header()
+        (length, start) = decoder._DecodeVarint(data, 0)
+        hdHeader.ParseFromString(data[start:start+length])
+        data = data[start+length:]
+        hdRows = []
+        n = len(data)
+        start = 0
+        while start < n:
+            (length, start) = decoder._DecodeVarint(data, start)
+            hdRow = pb.DimensionDeclaration
+            hdRow.ParseFromString(data[start:start+length])
+            hdRows.append(hdRow)
+            start += length
+        return (hdHeader, hdRows)
 
     def get_observations(self, study=None, patient_set=None, as_dataframe=False):
         """
@@ -130,7 +153,7 @@ class TransmartV2(TransmartAPIBase):
         return PatientSets(self.query(q))
 
     def get_hd_node_data(self, study, hd_type='autodetect', genes=None, transcripts=None, concept=None,
-                         patient_set=None, projection='all_data'):
+                         patient_set=None, projection='all_data', protobuf=False):
         """
 
         :param study:
@@ -150,6 +173,7 @@ class TransmartV2(TransmartAPIBase):
                   in_patientset=patient_set,
                   in_concept=concept,
                   in_gene_list=genes,
-                  in_transcript_list=transcripts
+                  in_transcript_list=transcripts,
+                  protobuf=protobuf
                   )
         return ObservationSetHD(self.query(q))
