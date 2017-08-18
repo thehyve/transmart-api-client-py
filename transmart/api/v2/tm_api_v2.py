@@ -5,14 +5,12 @@
 """
 
 import requests
-import google.protobuf.internal.decoder as decoder
-from .protobuf import observations_pb2 as pb
 
 from pandas.io.json import json_normalize
 
 from ..tm_api_base import TransmartAPIBase
 from .query import Query
-from .data_structures import ObservationSet, ObservationSetHD, TreeNodes, PatientSets, Studies, StudyList
+from .data_structures import ObservationSet, ObservationSetHD, TreeNodes, PatientSets, Studies, StudyList, ProtobufObservations
 
 
 class TransmartV2(TransmartAPIBase):
@@ -45,28 +43,12 @@ class TransmartV2(TransmartAPIBase):
         else:
             r = requests.post(url, json=q.params, headers=headers)
 
+        r.raise_for_status()
+
         if q.protobuf:
-            return r
-            # return self._parse_protobuf(r.content)
+            return r.content
 
         return r.json()
-
-    @staticmethod
-    def _parse_protobuf(data):
-        hdHeader = pb.Header()
-        (length, start) = decoder._DecodeVarint(data, 0)
-        hdHeader.ParseFromString(data[start:start+length])
-        data = data[start+length:]
-        hdRows = []
-        n = len(data)
-        start = 0
-        while start < n:
-            (length, start) = decoder._DecodeVarint(data, start)
-            hdRow = pb.DimensionDeclaration
-            hdRow.ParseFromString(data[start:start+length])
-            hdRows.append(hdRow)
-            start += length
-        return (hdHeader, hdRows)
 
     def get_observations(self, study=None, patient_set=None, as_dataframe=False):
         """
@@ -81,9 +63,10 @@ class TransmartV2(TransmartAPIBase):
         q = Query(handle='/v2/observations',
                   params={'type': 'clinical'},
                   in_study=study,
+                  protobuf=True,
                   in_patientset=patient_set)
 
-        observations = ObservationSet(self.query(q))
+        observations = ProtobufObservations(self.query(q))
 
         if as_dataframe:
             return observations.dataframe
@@ -153,7 +136,7 @@ class TransmartV2(TransmartAPIBase):
         return PatientSets(self.query(q))
 
     def get_hd_node_data(self, study, hd_type='autodetect', genes=None, transcripts=None, concept=None,
-                         patient_set=None, projection='all_data', protobuf=False):
+                         patient_set=None, projection='all_data'):
         """
 
         :param study:
@@ -174,6 +157,6 @@ class TransmartV2(TransmartAPIBase):
                   in_concept=concept,
                   in_gene_list=genes,
                   in_transcript_list=transcripts,
-                  protobuf=protobuf
+                  protobuf=True
                   )
-        return ObservationSetHD(self.query(q))
+        return ProtobufObservations(self.query(q))
