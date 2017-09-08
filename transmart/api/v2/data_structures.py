@@ -111,7 +111,9 @@ class TreeNodes:
         Create a pretty representation of tree.
         """
         if root is None:
-            root = self.json.get('tree_nodes')[0]
+            top_nodes = [self.pretty(root, depth=0, spacing=spacing) for root in self.json.get('tree_nodes')]
+            return '\n'.join(top_nodes)
+
         fmt = "%s%s/" if root.get('children') else "%s%s"
         s = fmt % (" " * depth * spacing, "{}  ({})".format(root.get('name'), root.get('patientCount')))
         for child in root.get('children', {}):
