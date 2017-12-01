@@ -12,11 +12,14 @@ class Query:
 
     def __init__(self, handle=None, method='GET', params=None, hal=False,
                  in_study=None, in_patientset=None, in_concept=None, in_gene_list=None,
-                 in_transcript_list=None):
+                 in_transcript_list=None, operator="and"):
         self.handle = handle
         self.method = method
         self.hal = hal
         self._params = params or {}
+
+        # Operator for constraints, default is and
+        self.operator = operator
 
         # Subject constraints
         self.in_study = StudyConstraint(in_study)
@@ -42,12 +45,18 @@ class Query:
         return {'Accept': 'application/{};charset=UTF-8'.format('hal+json' if self.hal else 'json')}
 
     def get_constraints(self):
-        constraints = ''.join([str(c) for c in (self.in_study, self.in_patientset, self.in_concept) if c.value])
+        constraints = []
+        for c in (self.in_study, self.in_patientset, self.in_concept):
+            if c.value:
+                constraints.append(c.get_constaint())
 
-        if constraints:
-            return {'constraint': constraints}
+        if len(constraints) > 1:
+            constraints = {'constraint': json.dumps({"type" : self.operator, "args": constraints})}
+        elif len(constraints) == 1:
+             constraints = {'constraint': json.dumps(constraints[0])}
         else:
-            return {}
+            constraints = {}
+        return constraints
 
     def get_biomarker_constraints(self):
         constraints = ''.join([str(c) for c in (self.in_transcript_list, self.in_gene_list) if c.value])
@@ -69,6 +78,9 @@ class Constraint:
 
     def __str__(self):
         return json.dumps({"type": self.type_, self.val_name: self.value})
+
+    def get_constaint(self):
+        return {"type": self.type_, self.val_name: self.value}
 
 
 class StudyConstraint(Constraint):

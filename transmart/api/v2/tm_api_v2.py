@@ -45,7 +45,7 @@ class TransmartV2(TransmartAPIBase):
 
         return r.json()
 
-    def get_observations(self, study=None, patient_set=None, as_dataframe=False):
+    def get_observations(self, study=None, patient_set=None, concept=None, as_dataframe=False):
         """
         Get observations, from the main table in the transmart data model.
 
@@ -56,9 +56,10 @@ class TransmartV2(TransmartAPIBase):
         """
 
         q = Query(handle='/v2/observations',
-                  params={'type': 'clinical'},
+                  params={"type": "clinical"},
                   in_study=study,
-                  in_patientset=patient_set)
+                  in_patientset=patient_set,
+                  in_concept=concept)
 
         observations = ObservationSet(self.query(q))
 
