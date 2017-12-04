@@ -24,18 +24,7 @@ class Query:
         # Subject constraints
         self.in_study = StudyConstraint(in_study)
         self.in_patientset = PatientSetConstraint(in_patientset)
-        if isinstance(in_concept, list):
-            self.in_concept = []
-            for concept_constraint in in_concept:
-                if "\\" in concept_constraint:
-                    self.in_concept.append(ConceptPathConstraint(concept_constraint))
-                else:
-                    self.in_concept.append(ConceptCodeConstraint(concept_constraint))
-        else:
-            if in_concept and "\\" in in_concept:
-                self.in_concept = ConceptPathConstraint(in_concept)
-            else:
-                self.in_concept = ConceptCodeConstraint(in_concept)
+        self.set_concept_constraint(in_concept)
 
         # Biomarker constraints
         self.in_gene_list = GenesConstraint(in_gene_list)
@@ -67,7 +56,10 @@ class Query:
         if len(constraints) > 1:
             constraints = {'constraint': json.dumps({"type" : self.operator, "args": constraints})}
         elif len(constraints) == 1:
-             constraints = {'constraint': json.dumps(constraints[0])}
+             if self.handle == "/v2/patient_sets":
+                 constraints = {'constraint': constraints[0]}
+             else:
+                 constraints = {'constraint': json.dumps(constraints[0])}
         else:
             constraints = {}
         return constraints
@@ -84,6 +76,21 @@ class Query:
         return "<Query(handle={}, method={}, params={})>".format(self.handle,
                                                                  self.method,
                                                                  self.params)
+
+    def set_concept_constraint(self, in_concept):
+        if isinstance(in_concept, list):
+            self.in_concept = []
+            for concept_constraint in in_concept:
+                if "\\" in concept_constraint:
+                    self.in_concept.append(ConceptPathConstraint(concept_constraint))
+                else:
+                    self.in_concept.append(ConceptCodeConstraint(concept_constraint))
+        else:
+            if in_concept and "\\" in in_concept:
+                self.in_concept = ConceptPathConstraint(in_concept)
+            else:
+                self.in_concept = ConceptCodeConstraint(in_concept)
+
 
 
 class Constraint:

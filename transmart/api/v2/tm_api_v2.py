@@ -41,7 +41,11 @@ class TransmartV2(TransmartAPIBase):
         if q.method.upper() == 'GET':
             r = requests.get(url, params=q.params, headers=headers)
         else:
-            r = requests.post(url, json=q.params, headers=headers)
+            if q.handle == "/v2/patient_sets":
+                headers['content-type'] = 'application/json'
+                r = requests.post(url, params={"name":q.params.get("name")}, json=(q.params.get("constraint")), headers=headers)
+            else:
+                r = requests.post(url, json=q.params, headers=headers)
 
         return r.json()
 
@@ -85,6 +89,19 @@ class TransmartV2(TransmartAPIBase):
         if as_dataframe:
             patients = json_normalize(patients['patients'])
         return patients
+
+    def create_patient_set(self, name, concept, operator=None):
+        """
+        Create a patient set with one concept as filter.
+
+        :param name: Name of the patient set
+        :param constraint: Concept path or code for which the patients should have an observation
+        :return: direct json
+        """
+        q = Query(handle='/v2/patient_sets', method="POST", params={"name":name}, in_concept=concept, operator=operator)
+
+        result = self.query(q)
+        return result
 
     def get_studies(self, as_dataframe=False):
         """
