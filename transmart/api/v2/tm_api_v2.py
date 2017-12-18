@@ -127,14 +127,16 @@ class TransmartV2(TransmartAPIBase):
 
     def tree_nodes(self, root=None, depth=0, counts=True, tags=True, hal=False):
         """
+        Return the tree hierarchy
 
-        :param root:
-        :param depth:
-        :param counts:
-        :param tags:
-        :param hal:
+        :param root: Specify the root of the tree to be returned
+        :param depth: The number of levels from the root need to be returned
+        :param counts: Whether to include counts with the tree nodes
+        :param tags: Whether to include metadata tags with the tree nodes
+        :param hal: Whether to return Hal or not (JSON)
         :return:
         """
+
         q = Query(handle='/v2/tree_nodes',
                   params={'root': root,
                           'depth': depth,
@@ -142,7 +144,11 @@ class TransmartV2(TransmartAPIBase):
                           'tags': tags},
                   hal=hal)
 
-        return TreeNodes(self.query(q))
+        tree_nodes = TreeNodes(self.query(q))
+        
+        tree_nodes.dataframe = json_normalize(tree_nodes.dataframe)
+
+        return tree_nodes
 
     def get_patient_sets(self):
         q = Query(handle='/v2/patient_sets')

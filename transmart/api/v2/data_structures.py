@@ -93,6 +93,7 @@ class Studies:
 
 
 class StudyList:
+
     def __init__(self, study_list):
         for study_id in study_list:
             self.__dict__[study_id.replace('-', '_')] = study_id
@@ -102,6 +103,7 @@ class TreeNodes:
 
     def __init__(self, json):
         self.json = json
+        self.dataframe = self.create_dataframe()
 
     def __repr__(self):
         return self.pretty()
@@ -110,6 +112,7 @@ class TreeNodes:
         """
         Create a pretty representation of tree.
         """
+        
         if root is None:
             top_nodes = [self.pretty(root, depth=0, spacing=spacing) for root in self.json.get('tree_nodes')]
             return '\n'.join(top_nodes)
@@ -119,6 +122,27 @@ class TreeNodes:
         for child in root.get('children', {}):
             s += "\n%s" % self.pretty(child, depth + 1, spacing)
         return s
+    
+    def create_dataframe(self, root=None):
+        """
+        Create dataframe representation of tree.
+        """
+        
+        if root is None:
+            top_nodes = []
+            for root in self.json.get('tree_nodes'):
+                top_nodes += self.create_dataframe(root)
+            return top_nodes
+
+        thisnode = root.copy()
+        thisnode.pop("children", None)
+        s = [thisnode]
+
+        for child in root.get('children', {}):
+            s += self.create_dataframe(child)
+        
+        return s
+        
 
 
 class PatientSets:
