@@ -145,8 +145,6 @@ class TransmartV2(TransmartAPIBase):
                   hal=hal)
 
         tree_nodes = TreeNodes(self.query(q))
-        
-        tree_nodes.dataframe = json_normalize(tree_nodes.dataframe)
 
         return tree_nodes
 
@@ -157,7 +155,6 @@ class TransmartV2(TransmartAPIBase):
     def get_hd_node_data(self, study=None, hd_type='autodetect', genes=None, transcripts=None, concept=None,
                          patient_set=None, projection='all_data', operator="and"):
         """
-
         :param study:
         :param hd_type:
         :param genes:
@@ -168,6 +165,7 @@ class TransmartV2(TransmartAPIBase):
         :param operator: ['and', 'or']
         :return:
         """
+
         q = Query(handle='/v2/observations',
                   method='POST',
                   params={'type': hd_type,

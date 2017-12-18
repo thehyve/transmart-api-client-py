@@ -103,7 +103,7 @@ class TreeNodes:
 
     def __init__(self, json):
         self.json = json
-        self.dataframe = self.create_dataframe()
+        self.dataframe = json_normalize(self.create_list())
 
     def __repr__(self):
         return self.pretty()
@@ -123,7 +123,7 @@ class TreeNodes:
             s += "\n%s" % self.pretty(child, depth + 1, spacing)
         return s
     
-    def create_dataframe(self, root=None):
+    def create_list(self, root=None):
         """
         Create dataframe representation of tree.
         """
@@ -131,7 +131,7 @@ class TreeNodes:
         if root is None:
             top_nodes = []
             for root in self.json.get('tree_nodes'):
-                top_nodes += self.create_dataframe(root)
+                top_nodes += self.create_list(root)
             return top_nodes
 
         thisnode = root.copy()
@@ -139,7 +139,7 @@ class TreeNodes:
         s = [thisnode]
 
         for child in root.get('children', {}):
-            s += self.create_dataframe(child)
+            s += self.create_list(child)
         
         return s
         
