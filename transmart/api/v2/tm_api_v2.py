@@ -154,8 +154,8 @@ class TransmartV2(TransmartAPIBase):
         q = Query(handle='/v2/patient_sets')
         return PatientSets(self.query(q))
 
-    def get_hd_node_data(self, study, hd_type='autodetect', genes=None, transcripts=None, concept=None,
-                         patient_set=None, projection='all_data'):
+    def get_hd_node_data(self, study=None, hd_type='autodetect', genes=None, transcripts=None, concept=None,
+                         patient_set=None, projection='all_data', operator="and"):
         """
 
         :param study:
@@ -165,6 +165,7 @@ class TransmartV2(TransmartAPIBase):
         :param concept:
         :param patient_set:
         :param projection: ['all_data', 'zscore', 'log_intensity']
+        :param operator: ['and', 'or']
         :return:
         """
         q = Query(handle='/v2/observations',
@@ -174,6 +175,7 @@ class TransmartV2(TransmartAPIBase):
                   in_study=study,
                   in_patientset=patient_set,
                   in_concept=concept,
+                  operator=operator,
                   in_gene_list=genes,
                   in_transcript_list=transcripts
                   )
