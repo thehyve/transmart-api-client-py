@@ -41,11 +41,11 @@ class TransmartV2(TransmartAPIBase):
         if q.method.upper() == 'GET':
             r = requests.get(url, params=q.params, headers=headers)
         else:
-            r = requests.post(url, json=q.params, headers=headers)
+            r = requests.post(url, json=q.json, params=q.params, headers=headers)
 
         return r.json()
 
-    def get_observations(self, study=None, patient_set=None, as_dataframe=False):
+    def get_observations(self, study=None, patient_set=None, concept=None, operator="and", as_dataframe=False):
         """
         Get observations, from the main table in the transmart data model.
 
@@ -56,9 +56,11 @@ class TransmartV2(TransmartAPIBase):
         """
 
         q = Query(handle='/v2/observations',
-                  params={'type': 'clinical'},
+                  params={"type": "clinical"},
                   in_study=study,
-                  in_patientset=patient_set)
+                  in_patientset=patient_set,
+                  in_concept=concept,
+                  operator=operator)
 
         observations = ObservationSet(self.query(q))
 
@@ -84,6 +86,23 @@ class TransmartV2(TransmartAPIBase):
             patients = json_normalize(patients['patients'])
         return patients
 
+    def create_patient_set(self, name, concept, operator=None):
+        """
+        Create a patient set with one concept as filter.
+
+        :param name: Name of the patient set
+        :param constraint: Concept path or code for which the patients should have an observation
+        :return: direct json
+        """
+        q = Query(handle='/v2/patient_sets', method="POST", params={"name":name}, in_concept=concept, operator=operator)
+
+        q.json = q.params.get("constraint")
+        del q.params['constraint']
+        q.headers['content-type'] = 'application/json'
+
+        result = self.query(q)
+        return result
+
     def get_studies(self, as_dataframe=False):
         """
         Get all studies.
@@ -108,14 +127,16 @@ class TransmartV2(TransmartAPIBase):
 
     def tree_nodes(self, root=None, depth=0, counts=True, tags=True, hal=False):
         """
+        Return the tree hierarchy
 
-        :param root:
-        :param depth:
-        :param counts:
-        :param tags:
-        :param hal:
+        :param root: Specify the root of the tree to be returned
+        :param depth: The number of levels from the root need to be returned
+        :param counts: Whether to include counts with the tree nodes
+        :param tags: Whether to include metadata tags with the tree nodes
+        :param hal: Whether to return Hal or not (JSON)
         :return:
         """
+
         q = Query(handle='/v2/tree_nodes',
                   params={'root': root,
                           'depth': depth,
@@ -123,16 +144,17 @@ class TransmartV2(TransmartAPIBase):
                           'tags': tags},
                   hal=hal)
 
-        return TreeNodes(self.query(q))
+        tree_nodes = TreeNodes(self.query(q))
+
+        return tree_nodes
 
     def get_patient_sets(self):
         q = Query(handle='/v2/patient_sets')
         return PatientSets(self.query(q))
 
-    def get_hd_node_data(self, study, hd_type='autodetect', genes=None, transcripts=None, concept=None,
-                         patient_set=None, projection='all_data'):
+    def get_hd_node_data(self, study=None, hd_type='autodetect', genes=None, transcripts=None, concept=None,
+                         patient_set=None, projection='all_data', operator="and"):
         """
-
         :param study:
         :param hd_type:
         :param genes:
@@ -140,8 +162,10 @@ class TransmartV2(TransmartAPIBase):
         :param concept:
         :param patient_set:
         :param projection: ['all_data', 'zscore', 'log_intensity']
+        :param operator: ['and', 'or']
         :return:
         """
+
         q = Query(handle='/v2/observations',
                   method='POST',
                   params={'type': hd_type,
@@ -149,7 +173,11 @@ class TransmartV2(TransmartAPIBase):
                   in_study=study,
                   in_patientset=patient_set,
                   in_concept=concept,
+                  operator=operator,
                   in_gene_list=genes,
                   in_transcript_list=transcripts
                   )
+        q.json = q.params
+        q._params = {}
+
         return ObservationSetHD(self.query(q))

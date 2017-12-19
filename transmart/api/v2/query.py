@@ -12,16 +12,20 @@ class Query:
 
     def __init__(self, handle=None, method='GET', params=None, hal=False,
                  in_study=None, in_patientset=None, in_concept=None, in_gene_list=None,
-                 in_transcript_list=None):
+                 in_transcript_list=None, operator="and"):
         self.handle = handle
         self.method = method
         self.hal = hal
         self._params = params or {}
+        self.json = None
+
+        # Operator for constraints, default is and
+        self.operator = operator
 
         # Subject constraints
         self.in_study = StudyConstraint(in_study)
         self.in_patientset = PatientSetConstraint(in_patientset)
-        self.in_concept = ConceptConstraint(in_concept)
+        self.set_concept_constraint(in_concept)
 
         # Biomarker constraints
         self.in_gene_list = GenesConstraint(in_gene_list)
@@ -42,12 +46,24 @@ class Query:
         return {'Accept': 'application/{};charset=UTF-8'.format('hal+json' if self.hal else 'json')}
 
     def get_constraints(self):
-        constraints = ''.join([str(c) for c in (self.in_study, self.in_patientset, self.in_concept) if c.value])
+        constraints = []
+        for c in (self.in_study, self.in_patientset, self.in_concept):
+            if isinstance(c, list):
+                for v in c:
+                    constraints.append(v.get_constraint())
+            elif c.value:
+                constraints.append(c.get_constraint())
 
-        if constraints:
-            return {'constraint': constraints}
+        if len(constraints) > 1:
+            constraints = {'constraint': json.dumps({"type" : self.operator, "args": constraints})}
+        elif len(constraints) == 1:
+             if self.handle == "/v2/patient_sets":
+                 constraints = {'constraint': constraints[0]}
+             else:
+                 constraints = {'constraint': json.dumps(constraints[0])}
         else:
-            return {}
+            constraints = {}
+        return constraints
 
     def get_biomarker_constraints(self):
         constraints = ''.join([str(c) for c in (self.in_transcript_list, self.in_gene_list) if c.value])
@@ -62,6 +78,21 @@ class Query:
                                                                  self.method,
                                                                  self.params)
 
+    def set_concept_constraint(self, in_concept):
+        if isinstance(in_concept, list):
+            self.in_concept = []
+            for concept_constraint in in_concept:
+                if "\\" in concept_constraint:
+                    self.in_concept.append(ConceptPathConstraint(concept_constraint))
+                else:
+                    self.in_concept.append(ConceptCodeConstraint(concept_constraint))
+        else:
+            if in_concept and "\\" in in_concept:
+                self.in_concept = ConceptPathConstraint(in_concept)
+            else:
+                self.in_concept = ConceptCodeConstraint(in_concept)
+
+
 
 class Constraint:
     def __init__(self, value):
@@ -69,6 +100,9 @@ class Constraint:
 
     def __str__(self):
         return json.dumps({"type": self.type_, self.val_name: self.value})
+
+    def get_constraint(self):
+        return {"type": self.type_, self.val_name: self.value}
 
 
 class StudyConstraint(Constraint):
@@ -81,9 +115,13 @@ class PatientSetConstraint(Constraint):
     val_name = 'patientSetId'
 
 
-class ConceptConstraint(Constraint):
+class ConceptPathConstraint(Constraint):
     type_ = 'concept'
     val_name = 'path'
+
+class ConceptCodeConstraint(Constraint):
+    type_ = 'concept'
+    val_name = 'conceptCode'
 
 
 class BiomarkerConstraint(Constraint):
