@@ -41,11 +41,7 @@ class TransmartV2(TransmartAPIBase):
         if q.method.upper() == 'GET':
             r = requests.get(url, params=q.params, headers=headers)
         else:
-            if q.handle == "/v2/patient_sets":
-                headers['content-type'] = 'application/json'
-                r = requests.post(url, params={"name":q.params.get("name")}, json=(q.params.get("constraint")), headers=headers)
-            else:
-                r = requests.post(url, json=q.params, headers=headers)
+            r = requests.post(url, json=q.json, params=q.params, headers=headers)
 
         return r.json()
 
@@ -99,6 +95,10 @@ class TransmartV2(TransmartAPIBase):
         :return: direct json
         """
         q = Query(handle='/v2/patient_sets', method="POST", params={"name":name}, in_concept=concept, operator=operator)
+
+        q.json = q.params.get("constraint")
+        del q.params['constraint']
+        q.headers['content-type'] = 'application/json'
 
         result = self.query(q)
         return result
@@ -177,4 +177,7 @@ class TransmartV2(TransmartAPIBase):
                   in_gene_list=genes,
                   in_transcript_list=transcripts
                   )
+        q.json = q.params
+        q._params = {}
+
         return ObservationSetHD(self.query(q))

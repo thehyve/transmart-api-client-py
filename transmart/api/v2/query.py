@@ -17,6 +17,7 @@ class Query:
         self.method = method
         self.hal = hal
         self._params = params or {}
+        self.json = None
 
         # Operator for constraints, default is and
         self.operator = operator
