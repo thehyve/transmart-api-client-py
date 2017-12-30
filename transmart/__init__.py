@@ -1,4 +1,5 @@
-"""tmtk - A toolkit for ETL curation for the tranSMART data warehouse."""
+"""transmart-api-client-py - A Python toolkit for data retrieval from the
+tranSMART data warehouse."""
 
 from .main import get_api
 
