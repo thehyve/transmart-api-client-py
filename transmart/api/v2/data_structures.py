@@ -104,9 +104,15 @@ class TreeNodes:
     def __init__(self, json):
         self.json = json
         self.dataframe = json_normalize(self.create_list())
+        self.tree_dict = self.create_tree_dict()
 
     def __repr__(self):
         return self.pretty()
+
+    def create_tree_dict(self):
+        filled_tree = self.dataframe.fillna('')
+        concepts_sub_tree = filled_tree[filled_tree['type'] != 'UNKNOWN']
+        return concepts_sub_tree.set_index('fullName').T.to_dict()
 
     def pretty(self, root=None, depth=0, spacing=2):
         """
@@ -142,7 +148,6 @@ class TreeNodes:
             s += self.create_list(child)
         
         return s
-        
 
 
 class PatientSets:

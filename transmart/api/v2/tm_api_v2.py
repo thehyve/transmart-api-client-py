@@ -4,19 +4,23 @@
 * version 3.
 """
 
-import requests
+import logging
 
+import requests
 from pandas.io.json import json_normalize
 
-from ..tm_api_base import TransmartAPIBase
-from .query import Query
 from .data_structures import ObservationSet, ObservationSetHD, TreeNodes, PatientSets, Studies, StudyList
+from .query import Query, ObservationConstraint
+from .concept_search import ConceptSearcher
+from ..tm_api_base import TransmartAPIBase
+
+logger = logging.getLogger('tm-api')
 
 
 class TransmartV2(TransmartAPIBase):
     """ Connect to tranSMART using Python. """
 
-    def __init__(self, host, user=None, password=None, print_urls=False):
+    def __init__(self, host, user=None, password=None, print_urls=False, interactive=True):
         """
         Create the python transmart client by providing user credentials.
 
@@ -24,9 +28,25 @@ class TransmartV2(TransmartAPIBase):
         :param user: if not given, it asks for it.
         :param password: if not given, it asks for it.
         :param print_urls: print the url of handles being used.
+        :param interactive: automatically build caches for interactive use.
         """
         super().__init__(host, user, password, print_urls)
         self.studies = None
+        self.tree_dict = None
+        self.search_tree_node = None
+
+        if interactive:
+            self.build_cache()
+
+    def build_cache(self):
+        logger.debug('Caching list of studies.')
+        self.get_studies()
+
+        logger.debug('Caching full tree as tree_dict.')
+        full_tree = self.tree_nodes()
+        self.tree_dict = full_tree.tree_dict
+
+        self.search_tree_node = ConceptSearcher(self.tree_dict).search
 
     def query(self, q):
         """ Perform query using API client using a Query object """
@@ -94,7 +114,11 @@ class TransmartV2(TransmartAPIBase):
         :param constraint: Concept path or code for which the patients should have an observation
         :return: direct json
         """
-        q = Query(handle='/v2/patient_sets', method="POST", params={"name":name}, in_concept=concept, operator=operator)
+        q = Query(handle='/v2/patient_sets',
+                  method="POST",
+                  params={"name": name},
+                  in_concept=concept,
+                  operator=operator)
 
         q.json = q.params.get("constraint")
         del q.params['constraint']
@@ -115,15 +139,17 @@ class TransmartV2(TransmartAPIBase):
 
         studies = Studies(self.query(q))
 
-        self.studies = StudyList(studies.dataframe.studyId)
+        if self.studies is None:
+            self.studies = StudyList(studies.dataframe.studyId)
 
         if as_dataframe:
             studies = studies.dataframe
 
         return studies
 
-    def get_concepts(self, study, hal=False):
-        raise NotImplementedError("Call not available for API V2.")
+    def get_concepts(self):
+        q = Query(handle='/v2/concepts')
+        return json_normalize(self.query(q).get('concepts'))
 
     def tree_nodes(self, root=None, depth=0, counts=True, tags=True, hal=False):
         """
@@ -181,3 +207,18 @@ class TransmartV2(TransmartAPIBase):
         q._params = {}
 
         return ObservationSetHD(self.query(q))
+
+    def aggregates_per_concept(self, obs_constraint=None):
+        q = Query(handle='/v2/observations/aggregates_per_concept',
+                  method='POST')
+
+        if obs_constraint is None:
+            obs_constraint = ObservationConstraint()
+
+        q.json = obs_constraint.json()
+        return self.query(q)
+
+    def new_constraint(self, *args, **kwargs):
+        return ObservationConstraint(api=self, *args, **kwargs)
+
+    new_constraint.__doc__ = ObservationConstraint.__init__.__doc__
