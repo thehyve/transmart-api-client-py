@@ -52,8 +52,6 @@ class TransmartV2(TransmartAPIBase):
         """ Perform query using API client using a Query object """
 
         url = "{}{}".format(self.host, q.handle)
-        if self.print_urls:
-            print(q)
 
         headers = q.headers
         headers['Authorization'] = 'Bearer ' + self.access_token
@@ -62,6 +60,9 @@ class TransmartV2(TransmartAPIBase):
             r = requests.get(url, params=q.params, headers=headers)
         else:
             r = requests.post(url, json=q.json, params=q.params, headers=headers)
+
+        if self.print_urls:
+            print(r.url)
 
         return r.json()
 
@@ -216,6 +217,19 @@ class TransmartV2(TransmartAPIBase):
             obs_constraint = ObservationConstraint()
 
         q.json = obs_constraint.json()
+        return self.query(q)
+
+    def dimension_elements(self, dimension=None, obs_constraint=None):
+
+        if obs_constraint is None:
+            obs_constraint = ObservationConstraint()
+
+        q = Query(handle='/v2/dimensions/{}/elements'.format(dimension),
+                  method='GET')
+
+        # Requests library has no standard for marshalling nested dicts for GET methods.
+        # So here we have to create a string of the nested query.
+        q._params = {'constraint': str(obs_constraint.json().get('constraint'))}
         return self.query(q)
 
     def new_constraint(self, *args, **kwargs):

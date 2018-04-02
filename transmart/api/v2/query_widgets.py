@@ -4,6 +4,8 @@ import ipywidgets as widgets
 from functools import wraps
 from ipywidgets import VBox, HBox
 
+import math
+
 AGG_NUM = 'numericalValueAggregates'
 AGG_CAT = 'categoricalValueAggregates'
 
@@ -158,7 +160,7 @@ class ConstraintWidget:
             step=0.1,
             description='Value range:',
             orientation='horizontal',
-            # readout=True,
+            readout=True,
             readout_format='.2f',
         )
 
@@ -167,8 +169,17 @@ class ConstraintWidget:
             for i in range(sys.maxsize ** 10):
                 x = yield
                 if len(x) == 2:
-                    self.constraint.min_value = x[0]
-                    self.constraint.max_value = x[1]
+                    min_ = float(x[0])
+                    max_ = float(x[1])
+                    if min_ is not None and not math.isclose(min_, float(self.numeric_range.min)):
+                        self.constraint.min_value = min_
+                    else:
+                        self.constraint.min_value = None
+
+                    if max_ is not None and not math.isclose(max_, float(self.numeric_range.max)):
+                        self.constraint.max_value = max_
+                    else:
+                        self.constraint.max_value = None
 
         self.categorical_select = widgets.SelectMultiple(
             options=[],
@@ -180,9 +191,9 @@ class ConstraintWidget:
             for i in range(sys.maxsize ** 10):
                 x = yield
                 if len(x):
-                    self.constraint.trial_visit = list(x)
+                    self.constraint.value_list = list(x)
                 else:
-                    self.constraint.trial_visit = None
+                    self.constraint.value_list = None
 
         numeric_range_watcher()
         categorical_select_watcher()
@@ -228,7 +239,8 @@ class ConstraintWidget:
             agg = aggregates.get(AGG_NUM)
             min_, max_ = (agg.get('min'), agg.get('max'))
             self.numeric_range.max = float('Inf')
-            self.numeric_range.value = (self.numeric_range.min, self.numeric_range.max) = (min_, max_)
+            self.numeric_range.min, self.numeric_range.max = (min_, max_)
+            self.numeric_range.value = (min_, max_)
             self.set_numerical()
 
         else:

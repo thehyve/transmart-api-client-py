@@ -4,6 +4,8 @@
 * version 3.
 """
 
+from functools import wraps
+
 import json
 
 from .query_widgets import ConceptPicker, ConstraintWidget
@@ -11,6 +13,28 @@ from .query_widgets import ConceptPicker, ConstraintWidget
 
 class InvalidConstraint(Exception):
     pass
+
+
+def input_check(types):
+    """
+    :param types: tuple of allowed types.
+    :return: decorator that validates input of property setter.
+    """
+
+    if not isinstance(types, tuple):
+        raise ValueError('Input check types has to be tuple, got {!r}'.format(type(types)))
+
+    def input_check_decorator(fn):
+        @wraps(fn)
+        def wrapper(value):
+            if value is not None:
+                if type(value) not in types:
+                    raise ValueError('Expected type {!r} for {!r}, but got {!r}'.
+                                     format(types, fn, type(value)))
+                else:
+                    return value
+        return wrapper
+    return input_check_decorator
 
 
 class Query:
@@ -24,6 +48,7 @@ class Query:
         self.hal = hal
         self._params = params or {}
         self.json = None
+        self.in_concept = in_concept
 
         # Operator for constraints, default is and
         self.operator = operator
@@ -56,9 +81,9 @@ class Query:
         for c in (self.in_study, self.in_patientset, self.in_concept):
             if isinstance(c, list):
                 for v in c:
-                    constraints.append(v.get_constraint())
+                    constraints.append(v.json())
             elif c.value:
-                constraints.append(c.get_constraint())
+                constraints.append(c.json())
 
         if len(constraints) > 1:
             constraints = {'constraint': json.dumps({"type" : self.operator, "args": constraints})}
@@ -113,9 +138,9 @@ class Constraint:
         raise NotImplementedError
 
     def __str__(self):
-        return json.dumps(self.get_constraint())
+        return json.dumps(self.json())
 
-    def get_constraint(self):
+    def json(self):
         return {'type': self.type_, self.val_name: self.value}
 
 
@@ -140,9 +165,9 @@ class FieldConstraint:
         raise NotImplementedError
 
     def __str__(self):
-        return json.dumps(self.get_constraint())
+        return json.dumps(self.json())
 
-    def get_constraint(self):
+    def json(self):
         return {'type': 'field',
                 'field': {
                     'dimension': self.dimension,
@@ -150,6 +175,41 @@ class FieldConstraint:
                     'type': self.type_},
                 'operator': self.operator,
                 'value': self.value}
+
+
+class ValueConstraint:
+
+    def __init__(self, value):
+        self.value = value
+
+    @property
+    def value_type_(self):
+        raise NotImplementedError
+
+    @property
+    def operator(self):
+        raise NotImplementedError
+
+    def json(self):
+        return {'type': 'value',
+                'valueType': self.value_type_,
+                'operator': self.operator,
+                'value': self.value}
+
+
+class ValueListConstraint(ValueConstraint):
+    value_type_ = 'STRING'
+    operator = 'in'
+
+
+class MinValueConstraint(ValueConstraint):
+    value_type_ = 'NUMERIC'
+    operator = '>='
+
+
+class MaxValueConstraint(ValueConstraint):
+    value_type_ = 'NUMERIC'
+    operator = '<='
 
 
 class StudyConstraint(Constraint):
@@ -202,8 +262,15 @@ class ObservationConstraint:
     based on these constraints can be combined with other sets to
     create complex queries.
     """
-    params = ('concept', 'study', 'trial_visit', 'min_value',
-              'max_value', 'min_start_date', 'max_start_date')
+    params = {'concept': ConceptCodeConstraint,
+              'study': StudyConstraint,
+              'trial_visit': TrialVisitConstraint,
+              'min_value': MinValueConstraint,
+              'max_value': MaxValueConstraint,
+              'value_list': ValueListConstraint,
+              # 'min_start_date': Constraint,
+              # 'max_start_date': Constraint
+              }
 
     def __init__(self,
                  concept: str=None,
@@ -211,9 +278,10 @@ class ObservationConstraint:
                  trial_visit: list=None,
                  min_value=None,
                  max_value=None,
+                 value_list=None,
                  min_start_date=None,
                  max_start_date=None,
-                 api = None):
+                 api=None):
         """
         Represents constraints on observation level. This is the set of
         observations that adhere to all criteria specified. A patient set
@@ -229,21 +297,31 @@ class ObservationConstraint:
         :param max_start_date:
         """
 
-        self.__concept = concept
-        self.__trial_visit = trial_visit
+        self.__concept = None
+        self.__trial_visit = None
+        self.__value_list = None
+        self.__min_value = None
+        self.__max_value = None
+
+        self._aggregates = None
+        self._dimension_elements = None
+        self.api = api
+
+        if api is not None:
+            self._details_widget = ConstraintWidget(self)
+
+        self.concept = concept
+        self.trial_visit = trial_visit
+        self.value_list = value_list
         self.study = study
         self.min_value = min_value
         self.max_value = max_value
         self.min_start_date = min_start_date
         self.max_start_date = max_start_date
-        self.api = api
-
-        self._details_widget = ConstraintWidget(self)
-        self._aggregates = None
 
     def __len__(self):
         len_ = 0
-        for arg in self.params:
+        for arg in self.params.keys():
             if getattr(self, arg) is not None:
                 len_ += 1
 
@@ -251,7 +329,7 @@ class ObservationConstraint:
 
     def __repr__(self):
         arguments = []
-        for arg in self.params:
+        for arg in self.params.keys():
             if getattr(self, arg) is not None:
                 arguments.append(
                     '{}={}'.format(arg, getattr(self, arg))
@@ -287,12 +365,37 @@ class ObservationConstraint:
     def trial_visit(self):
         return self.__trial_visit
 
+    @input_check((list, ))
     @trial_visit.setter
     def trial_visit(self, value):
-        if value is None or isinstance(value, list):
-            self.__trial_visit = value
-        else:
-            raise ValueError('Expected list of trial visits is required.')
+        self.__trial_visit = value
+
+    @property
+    def value_list(self):
+        return self.__value_list
+
+    @input_check((list, ))
+    @value_list.setter
+    def value_list(self, value):
+        self.__value_list = value
+
+    @property
+    def min_value(self):
+        return self.__min_value
+
+    @input_check((int, float))
+    @min_value.setter
+    def min_value(self, value):
+        self.__min_value = value
+
+    @property
+    def max_value(self):
+        return self.__max_value
+
+    @input_check((int, float))
+    @max_value.setter
+    def max_value(self, value):
+        self.__max_value = value
 
     @property
     def concept(self):
@@ -305,18 +408,23 @@ class ObservationConstraint:
     def _set_concept_code(self, value):
 
         # Reset current constraints.
-        for arg in self.params:
+        for arg in self.params.keys():
             if arg != 'concept':
                 setattr(self, arg, None)
 
-        self._details_widget.set_initial()
-
         self.__concept = value
 
-        if self.api is not None:
-            self._aggregates = self.api.aggregates_per_concept(self)
-            agg = self._aggregates.get('aggregatesPerConcept', {}).get(self.concept, {})
-            self._details_widget.update_from_aggregates(agg)
+        if value is not None and self.api is not None:
+            self._details_widget.set_initial()
+
+            agg_response = self.api.aggregates_per_concept(self)
+            self._aggregates = agg_response.get('aggregatesPerConcept', {}).get(self.concept, {})
+
+            self._dimension_elements = {}
+            for dimension in ('trial visit', 'study', 'start time'):
+                self._dimension_elements[dimension] = self.api.dimension_elements(dimension, self).get('elements')
+
+            self._details_widget.update_from_aggregates(self._aggregates)
 
     def find_concept(self):
         if self.api is None:
@@ -333,20 +441,10 @@ class ObservationConstraint:
         if len(self) == 0:
             args.append({"type": "true"})
 
-        if self.study is not None:
-            args.append(
-                StudyConstraint(self.study).get_constraint()
-            )
-
-        if self.concept is not None:
-            args.append(
-                ConceptCodeConstraint(self.concept).get_constraint()
-            )
-
-        if self.trial_visit is not None:
-            args.append(
-                TrialVisitConstraint(list(self.trial_visit)).get_constraint()
-            )
+        for param, constraint in self.params.items():
+            attr = getattr(self, param)
+            if attr is not None:
+                args.append(constraint(attr).json())
 
         if len(self) > 1:
             constraint = dict()
@@ -357,6 +455,19 @@ class ObservationConstraint:
             constraint = args.pop()
 
         return {'constraint': constraint}
+
+    def subselect(self, dimension='patients'):
+        """
+        Query that represents all dimension elements that adhere to the
+        observation constraints, e.g. all patients that have observations
+        for which the criteria apply.
+
+        :param dimension: only patients is supported for now.
+        :return:
+        """
+        d = {'type': 'subselection', 'dimension': dimension}
+        d.update(self.json())
+        return d
 
 
 class GroupConstraint:
@@ -393,124 +504,11 @@ class GroupConstraint:
             else:
                 return GroupConstraint([self, other], my_type)
 
-
-
-
-# {
-#   "type": "subselection",
-#   "dimension": "patient",
-#   "constraint": {
-#   }
-# }
-#
-# {"type": "field", "field": {
-#     "dimension": "trial visit", "fieldName": "id", "type":"NUMERIC"},
-#  "operator": "in", "value":[27,28,31,32]}
-
-# {
-#   "type": "subselection",
-#   "dimension": "patient",
-#   "constraint": {
-#     "type": "and",
-#     "args": [
-#       {
-#         "type": "and",
-#         "args": [
-#           {
-#             "type": "concept",
-#             "conceptCode": "spake9"
-#           },
-#           {
-#             "type": "value",
-#             "valueType": "NUMERIC",
-#             "operator": ">=",
-#             "value": 3
-#           }
-#         ]
-#       },
-#       {
-#         "type": "study_name",
-#         "studyId": "ANTR_9"
-#       }
-#     ]
-#   }
-# }
-#
-# {
-#   "type": "subselection",
-#   "dimension": "patient",
-#   "constraint": {
-#     "type": "and",
-#     "args": [
-#       {
-#         "type": "and",
-#         "args": [
-#           {
-#             "type": "concept",
-#             "conceptCode": "spake9"
-#           },
-#           {
-#             "type": "value",
-#             "valueType": "NUMERIC",
-#             "operator": ">=",
-#             "value": 3
-#           },
-#           {
-#             "type": "value",
-#             "valueType": "NUMERIC",
-#             "operator": "<=",
-#             "value": 5
-#           }
-#         ]
-#       },
-#       {
-#         "type": "study_name",
-#         "studyId": "ANTR_9"
-#       }
-#     ]
-#   }
-# }
-#
-# {
-#   "type": "and",
-#   "args": [
-#     {
-#       "type": "subselection",
-#       "dimension": "patient",
-#       "constraint": {
-#         "type": "and",
-#         "args": [
-#           {
-#             "type": "concept",
-#             "conceptCode": "sex"
-#           },
-#           {
-#             "type": "or",
-#             "args": [
-#               {
-#                 "type": "value",
-#                 "valueType": "STRING",
-#                 "operator": "=",
-#                 "value": "female"
-#               },
-#               {
-#                 "type": "value",
-#                 "valueType": "STRING",
-#                 "operator": "=",
-#                 "value": "male"
-#               }
-#             ]
-#           }
-#         ]
-#       }
-#     },
-#     {
-#       "type": "subselection",
-#       "dimension": "patient",
-#       "constraint": {
-#         "type": "concept",
-#         "conceptCode": "sex"
-#       }
-#     }
-#   ]
-# }
+    def json(self):
+        return {
+          'type': 'subselection',
+          'dimension': 'patient',
+          'constraint': {
+            "type": self.group_type,
+            "args": [item.subselect() for item in self.items]}
+        }
