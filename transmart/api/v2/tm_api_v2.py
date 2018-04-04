@@ -4,14 +4,15 @@
 * version 3.
 """
 
+import json
 import logging
 
 import requests
 from pandas.io.json import json_normalize
 
+from .concept_search import ConceptSearcher
 from .data_structures import ObservationSet, ObservationSetHD, TreeNodes, PatientSets, Studies, StudyList
 from .query import Query, ObservationConstraint
-from .concept_search import ConceptSearcher
 from ..tm_api_base import TransmartAPIBase
 
 logger = logging.getLogger('tm-api')
@@ -229,7 +230,7 @@ class TransmartV2(TransmartAPIBase):
 
         # Requests library has no standard for marshalling nested dicts for GET methods.
         # So here we have to create a string of the nested query.
-        q._params = {'constraint': str(obs_constraint.json().get('constraint'))}
+        q._params = {'constraint': json.dumps(obs_constraint.json().get('constraint'))}
         return self.query(q)
 
     def new_constraint(self, *args, **kwargs):

@@ -144,7 +144,8 @@ class ConstraintWidget:
     def __init__(self, observation_constraint):
         self.constraint = observation_constraint
         self.numeric_range = self._build_numeric_range()
-        self.categorical_select = self._build_categorical_select()
+        self.categorical_select = self._build_list_selector('value_list', 'Values')
+        self.trial_visit_select = self._build_list_selector('trial_visit', 'Visits')
 
         def update_date_attr(attr):
             def observer(change):
@@ -166,6 +167,7 @@ class ConstraintWidget:
         self.constraint_details = VBox([
             self.numeric_range,
             self.categorical_select,
+            self.trial_visit_select,
             self.start_date_box
         ])
 
@@ -194,17 +196,17 @@ class ConstraintWidget:
         numeric_range.observe(numeric_range_watcher, 'value')
         return numeric_range
 
-    def _build_categorical_select(self):
-        def categorical_select_watcher(change):
+    def _build_list_selector(self, target, description):
+        def watcher(change):
             x = list(change.get('new')) or None
-            self.constraint.value_list = x
+            setattr(self.constraint, target, x)
 
-        categorical_select = widgets.SelectMultiple(
+        w = widgets.SelectMultiple(
             options=[],
-            description='Values')
+            description=description)
 
-        categorical_select.observe(categorical_select_watcher, 'value')
-        return categorical_select
+        w.observe(watcher, 'value')
+        return w
 
     def set_initial(self):
         widget_off(self.numeric_range)

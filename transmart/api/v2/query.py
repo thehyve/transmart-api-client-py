@@ -304,9 +304,9 @@ class ObservationConstraint:
         self.__max_value = None
         self.__min_start_date = None
         self.__max_start_date = None
-
-        self._aggregates = None
         self._dimension_elements = None
+        self._aggregates = None
+
         self.api = api
 
         if api is not None:
@@ -362,6 +362,40 @@ class ObservationConstraint:
                 return other
             if other.group_type == not_my_type:
                 return GroupConstraint([self, other], my_type)
+
+    def json(self):
+        args = []
+
+        if len(self) == 0:
+            args.append({"type": "true"})
+
+        for param, constraint in self.params.items():
+            attr = getattr(self, param)
+            if attr is not None:
+                args.append(constraint(attr).json())
+
+        if len(self) > 1:
+            constraint = dict()
+            constraint['args'] = args
+            constraint['type'] = 'and'
+
+        else:
+            constraint = args.pop()
+
+        return {'constraint': constraint}
+
+    def subselect(self, dimension='patients'):
+        """
+        Query that represents all dimension elements that adhere to the
+        observation constraints, e.g. all patients that have observations
+        for which the criteria apply.
+
+        :param dimension: only patients is supported for now.
+        :return:
+        """
+        d = {'type': 'subselection', 'dimension': dimension}
+        d.update(self.json())
+        return d
 
     @property
     def trial_visit(self):
@@ -458,6 +492,37 @@ class ObservationConstraint:
         if self.api is not None:
             self.fetch_updates()
 
+    def _dimension_elements_watcher(self):
+
+        def watcher(key, value):
+            if value is None:
+                return
+
+            if key == 'trial visit':
+                options = []
+                for tv in value:
+                    label = tv.get('relTimeLabel')
+
+                    if tv.get('relTime') or tv.get('relTimeUnit'):
+                        label += ' ({} {})'.format(tv.get('relTime'), tv.get('relTimeUnit'))
+
+                    options.append(
+                        (label, tv.get('id'))
+                    )
+
+                self._details_widget.trial_visit_select.options = sorted(options)
+                self._details_widget.trial_visit_select.rows = min(len(options) + 1, 5)
+
+            if key == 'start time':
+                pass
+
+        class DictWatcher(dict):
+            def __setitem__(self, key, value):
+                watcher(key, value)
+                super().__setitem__(key, value)
+
+        return DictWatcher()
+
     def fetch_updates(self):
 
         if self.api is not None:
@@ -467,7 +532,7 @@ class ObservationConstraint:
             self._aggregates = agg_response.get('aggregatesPerConcept', {}).get(self.concept, {})
             self._details_widget.update_from_aggregates(self._aggregates)
 
-            self._dimension_elements = {}
+            self._dimension_elements = self._dimension_elements_watcher()
             for dimension in ('trial visit', 'study', 'start time'):
                 self._dimension_elements[dimension] = self.api.dimension_elements(dimension, self).get('elements')
 
@@ -479,40 +544,6 @@ class ObservationConstraint:
 
     def interact(self):
         return self._details_widget.get()
-
-    def json(self):
-        args = []
-
-        if len(self) == 0:
-            args.append({"type": "true"})
-
-        for param, constraint in self.params.items():
-            attr = getattr(self, param)
-            if attr is not None:
-                args.append(constraint(attr).json())
-
-        if len(self) > 1:
-            constraint = dict()
-            constraint['args'] = args
-            constraint['type'] = 'and'
-
-        else:
-            constraint = args.pop()
-
-        return {'constraint': constraint}
-
-    def subselect(self, dimension='patients'):
-        """
-        Query that represents all dimension elements that adhere to the
-        observation constraints, e.g. all patients that have observations
-        for which the criteria apply.
-
-        :param dimension: only patients is supported for now.
-        :return:
-        """
-        d = {'type': 'subselection', 'dimension': dimension}
-        d.update(self.json())
-        return d
 
 
 class GroupConstraint:
