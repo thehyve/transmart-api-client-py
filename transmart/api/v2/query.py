@@ -3,9 +3,6 @@
 * This code is licensed under the GNU General Public License,
 * version 3.
 """
-
-from functools import wraps
-
 import json
 
 from .query_widgets import ConceptPicker, ConstraintWidget
@@ -20,21 +17,56 @@ def input_check(types):
     :param types: tuple of allowed types.
     :return: decorator that validates input of property setter.
     """
-
     if not isinstance(types, tuple):
         raise ValueError('Input check types has to be tuple, got {!r}'.format(type(types)))
 
-    def input_check_decorator(fn):
-        @wraps(fn)
-        def wrapper(value):
+    def input_check_decorator(func):
+        def wrapper(self, value):
+
             if value is not None:
                 if type(value) not in types:
                     raise ValueError('Expected type {!r} for {!r}, but got {!r}'.
-                                     format(types, fn, type(value)))
-                else:
-                    return value
+                                     format(types, func, type(value)))
+            return func(self, value)
         return wrapper
     return input_check_decorator
+
+
+def bind_widget_tuple(target, pos):
+    """
+    :param target: widget to bind to.
+    :param pos: position in tuple.
+    """
+    def bind_decorator(func):
+        def wrapper(self, value):
+            if value is not None:
+                w = getattr(self._details_widget, target)
+                with w.hold_sync():
+
+                    state = list(w.value)
+                    state[pos] = value
+                    w.value = tuple(state)
+
+            return func(self, value)
+        return wrapper
+    return bind_decorator
+
+
+def bind_widget_list(target):
+    """
+    :param target: widget to bind to.
+    :param pos: position in tuple.
+    """
+    def bind_decorator(func):
+        def wrapper(self, value):
+            w = getattr(self._details_widget, target)
+            with w.hold_sync():
+
+                w.value = () if value is None else tuple(value)
+
+            return func(self, value)
+        return wrapper
+    return bind_decorator
 
 
 class Query:
@@ -399,37 +431,53 @@ class ObservationConstraint:
 
     @property
     def trial_visit(self):
+        """
+        List of trial visits by id.
+        """
         return self.__trial_visit
 
-    @input_check((list, ))
     @trial_visit.setter
+    @input_check((list, ))
+    @bind_widget_list('trial_visit_select')
     def trial_visit(self, value):
         self.__trial_visit = value
 
     @property
     def value_list(self):
+        """
+        List of categorical options.
+        """
         return self.__value_list
 
-    @input_check((list, ))
     @value_list.setter
+    @input_check((list, ))
+    @bind_widget_list('categorical_select')
     def value_list(self, value):
         self.__value_list = value
 
     @property
     def min_value(self):
+        """
+        Minimum value for numerical concepts, int or float.
+        """
         return self.__min_value
 
-    @input_check((int, float))
     @min_value.setter
+    @input_check((int, float))
+    @bind_widget_tuple('numeric_range', 0)
     def min_value(self, value):
         self.__min_value = value
 
     @property
     def max_value(self):
+        """
+        Maximum value for numerical concepts, int or float.
+        """
         return self.__max_value
 
-    @input_check((int, float))
     @max_value.setter
+    @input_check((int, float))
+    @bind_widget_tuple('numeric_range', 1)
     def max_value(self, value):
         self.__max_value = value
 
@@ -445,8 +493,8 @@ class ObservationConstraint:
     def max_start_date(self):
         return self.__max_start_date
 
-    @input_check((str, ))
     @max_start_date.setter
+    @input_check((str, ))
     def max_start_date(self, value):
         self.__max_start_date = value
 
@@ -454,8 +502,8 @@ class ObservationConstraint:
     def min_start_date(self):
         return self.__min_start_date
 
-    @input_check((str, ))
     @min_start_date.setter
+    @input_check((str, ))
     def min_start_date(self, value):
         self.__min_start_date = value
 

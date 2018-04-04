@@ -2,7 +2,7 @@ import math
 
 import ipywidgets as widgets
 from IPython.display import HTML, display
-from ipywidgets import VBox, HBox
+from ipywidgets import VBox, HBox, Box
 
 AGG_NUM = 'numericalValueAggregates'
 AGG_CAT = 'categoricalValueAggregates'
@@ -169,7 +169,7 @@ class ConstraintWidget:
             self.categorical_select,
             self.trial_visit_select,
             self.start_date_box
-        ])
+        ], layout={'height': '225px'})
 
         self.set_initial()
 
@@ -224,16 +224,21 @@ class ConstraintWidget:
     def update_from_aggregates(self, aggregates):
         if aggregates.get(AGG_CAT):
             agg = aggregates.get(AGG_CAT)
-            self.categorical_select.value = tuple()
-            self.categorical_select.options = {'{} ({})'.format(k, v): k for k, v in agg['valueCounts'].items()}
+            w = self.categorical_select
+
+            w.value = tuple()
+            w.options = {'{} ({})'.format(k, v): k for k, v in agg['valueCounts'].items()}
+            w.rows = min(len(w.options) + 1, 5)
             self.set_categorical()
 
         elif aggregates.get(AGG_NUM):
             agg = aggregates.get(AGG_NUM)
+            w = self.numeric_range
             min_, max_ = (agg.get('min'), agg.get('max'))
-            self.numeric_range.max = float('Inf')
-            self.numeric_range.min, self.numeric_range.max = (min_, max_)
-            self.numeric_range.value = (min_, max_)
+
+            w.max = float('Inf')
+            w.min, w.max = (min_, max_)
+            w.value = (min_, max_)
             self.set_numerical()
 
         else:
