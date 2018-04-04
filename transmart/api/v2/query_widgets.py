@@ -3,6 +3,8 @@ import math
 import ipywidgets as widgets
 from IPython.display import HTML, display
 from ipywidgets import VBox, HBox, Box
+import arrow
+
 
 AGG_NUM = 'numericalValueAggregates'
 AGG_CAT = 'categoricalValueAggregates'
@@ -149,7 +151,10 @@ class ConstraintWidget:
 
         def update_date_attr(attr):
             def observer(change):
-                date = change.get('new').isoformat()
+                try:
+                    date = change.get('new').isoformat()
+                except AttributeError:
+                    date = None
                 setattr(self.constraint, attr, date)
             return observer, 'value'
 
@@ -243,6 +248,31 @@ class ConstraintWidget:
 
         else:
             self.set_initial()
+
+    def update_trial_visits(self, visits):
+        w = self.trial_visit_select
+        options = []
+        for tv in visits:
+            label = tv.get('relTimeLabel')
+
+            if tv.get('relTime') or tv.get('relTimeUnit'):
+                label += ' ({} {})'.format(tv.get('relTime'), tv.get('relTimeUnit'))
+
+            options.append(
+                (label, tv.get('id'))
+            )
+
+        w.options = sorted(options)
+        w.rows = min(len(options) + 1, 5)
+        w.disabled = len(options) == 1
+
+    def update_start_time(self, dates):
+        dates = [arrow.get(d).date() for d in dates if not d.startswith('000')]
+        w1 = self.start_date_since
+        w2 = self.start_date_before
+        w1.value = min(dates, default=None)
+        w2.value = max(dates, default=None)
+        w1.disabled = w2.disabled = len(dates) < 2
 
     def get(self):
         display(HTML(self.html_style))

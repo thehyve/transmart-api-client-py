@@ -287,6 +287,17 @@ class TrialVisitConstraint(FieldConstraint):
     operator = 'in'
 
 
+class StartTimeBeforeConstraint(FieldConstraint):
+    type_ = 'DATE'
+    dimension = 'start time'
+    fieldName = 'startDate'
+    operator = '<-'
+
+
+class StartTimeAfterConstraint(StartTimeBeforeConstraint):
+    operator = '->'
+
+
 class ObservationConstraint:
     """
     Represents constraints on observation level. This is the set of
@@ -300,8 +311,8 @@ class ObservationConstraint:
               'min_value': MinValueConstraint,
               'max_value': MaxValueConstraint,
               'value_list': ValueListConstraint,
-              'min_start_date': MinValueConstraint,
-              'max_start_date': MaxValueConstraint
+              'min_start_date': StartTimeAfterConstraint,
+              'max_start_date': StartTimeBeforeConstraint
               }
 
     def __init__(self,
@@ -547,22 +558,10 @@ class ObservationConstraint:
                 return
 
             if key == 'trial visit':
-                options = []
-                for tv in value:
-                    label = tv.get('relTimeLabel')
+                self._details_widget.update_trial_visits(value)
 
-                    if tv.get('relTime') or tv.get('relTimeUnit'):
-                        label += ' ({} {})'.format(tv.get('relTime'), tv.get('relTimeUnit'))
-
-                    options.append(
-                        (label, tv.get('id'))
-                    )
-
-                self._details_widget.trial_visit_select.options = sorted(options)
-                self._details_widget.trial_visit_select.rows = min(len(options) + 1, 5)
-
-            if key == 'start time':
-                pass
+            elif key == 'start time':
+                self._details_widget.update_start_time(value)
 
         class DictWatcher(dict):
             def __setitem__(self, key, value):
@@ -573,11 +572,11 @@ class ObservationConstraint:
 
     def fetch_updates(self):
 
-        if self.api is not None:
-            self._details_widget.set_initial()
-
+        if self.api is not None and self.api.interactive:
             agg_response = self.api.aggregates_per_concept(self)
             self._aggregates = agg_response.get('aggregatesPerConcept', {}).get(self.concept, {})
+
+            self._details_widget.set_initial()
             self._details_widget.update_from_aggregates(self._aggregates)
 
             self._dimension_elements = self._dimension_elements_watcher()

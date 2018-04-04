@@ -35,6 +35,7 @@ class TransmartV2(TransmartAPIBase):
         self.studies = None
         self.tree_dict = None
         self.search_tree_node = None
+        self.interactive = interactive
 
         if interactive:
             self.build_cache()
