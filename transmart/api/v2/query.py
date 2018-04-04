@@ -268,8 +268,8 @@ class ObservationConstraint:
               'min_value': MinValueConstraint,
               'max_value': MaxValueConstraint,
               'value_list': ValueListConstraint,
-              # 'min_start_date': Constraint,
-              # 'max_start_date': Constraint
+              'min_start_date': MinValueConstraint,
+              'max_start_date': MaxValueConstraint
               }
 
     def __init__(self,
@@ -302,6 +302,8 @@ class ObservationConstraint:
         self.__value_list = None
         self.__min_value = None
         self.__max_value = None
+        self.__min_start_date = None
+        self.__max_start_date = None
 
         self._aggregates = None
         self._dimension_elements = None
@@ -403,34 +405,77 @@ class ObservationConstraint:
 
     @concept.setter
     def concept(self, value):
-        self._set_concept_code(value)
+        self.__concept = value
 
-    def _set_concept_code(self, value):
+    @property
+    def max_start_date(self):
+        return self.__max_start_date
+
+    @input_check((str, ))
+    @max_start_date.setter
+    def max_start_date(self, value):
+        self.__max_start_date = value
+
+    @property
+    def min_start_date(self):
+        return self.__min_start_date
+
+    @input_check((str, ))
+    @min_start_date.setter
+    def min_start_date(self, value):
+        self.__min_start_date = value
+
+    def apply_tree_node_constraints(self, constraints):
+        """
+        Reset current argument and apply those from a tree node constraints dict.
+
+        :param constraints: constraints from tree node.
+        """
+
+        keyword_map = [
+            ('concept', 'conceptCode'),
+            ('study', 'studyId')
+        ]
+
+        if not constraints:
+            raise ValueError('Expected dict, got {!r}'.format(type(constraints)))
 
         # Reset current constraints.
         for arg in self.params.keys():
-            if arg != 'concept':
-                setattr(self, arg, None)
+            setattr(self, arg, None)
 
-        self.__concept = value
+        try:
+            constraint_list = constraints['args']
 
-        if value is not None and self.api is not None:
+        except KeyError:
+            constraint_list = [constraints]
+
+        for c in constraint_list:
+            for kw in keyword_map:
+                if c.get(kw[1]):
+                    setattr(self, kw[0], c.get(kw[1]))
+
+        if self.api is not None:
+            self.fetch_updates()
+
+    def fetch_updates(self):
+
+        if self.api is not None:
             self._details_widget.set_initial()
 
             agg_response = self.api.aggregates_per_concept(self)
             self._aggregates = agg_response.get('aggregatesPerConcept', {}).get(self.concept, {})
+            self._details_widget.update_from_aggregates(self._aggregates)
 
             self._dimension_elements = {}
             for dimension in ('trial visit', 'study', 'start time'):
                 self._dimension_elements[dimension] = self.api.dimension_elements(dimension, self).get('elements')
 
-            self._details_widget.update_from_aggregates(self._aggregates)
-
     def find_concept(self):
         if self.api is None:
             raise AttributeError('{}.api not set. Cannot be interactive.'.format(self.__class__))
 
-        return ConceptPicker(target=self._set_concept_code, api=self.api).get()
+        return ConceptPicker(target=self.apply_tree_node_constraints, api=self.api).get()
 
     def interact(self):
         return self._details_widget.get()

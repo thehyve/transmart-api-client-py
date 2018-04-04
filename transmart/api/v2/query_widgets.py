@@ -1,37 +1,11 @@
-import sys
+import math
 
 import ipywidgets as widgets
-from functools import wraps
+from IPython.display import HTML, display
 from ipywidgets import VBox, HBox
-
-import math
 
 AGG_NUM = 'numericalValueAggregates'
 AGG_CAT = 'categoricalValueAggregates'
-
-
-def yield_for_change(widget, attribute):
-    """Pause a generator to wait for a widget change event.
-
-    This is a decorator for a generator function which pauses the generator on yield
-    until the given widget attribute changes. The new value of the attribute is
-    sent to the generator and is the value of the yield.
-    """
-    def f(iterator):
-        @wraps(iterator)
-        def inner():
-            i = iterator()
-
-            def next_i(change):
-                try:
-                    i.send(change.new)
-                except StopIteration as e:
-                    widget.unobserve(next_i, attribute)
-            widget.observe(next_i, attribute)
-            # start the generator
-            next(i)
-        return inner
-    return f
 
 
 def widget_on(widget):
@@ -85,64 +59,67 @@ class ConceptPicker:
         self.target = target
         self.api = api
 
-        list_of_default_options = sorted(self.api.tree_dict.keys())
-        no_filter_len = len(list_of_default_options)
-
-        self.search_bar = widgets.Text(
-            placeholder='Type something',
-            disabled=False
-        )
+        self.list_of_default_options = sorted(self.api.tree_dict.keys())
+        self.no_filter_len = len(self.list_of_default_options)
 
         self.result_count = widgets.HTML(
-            value=self.result_count_template.format(no_filter_len)
+            value=self.result_count_template.format(self.no_filter_len)
         )
-
-        self.concept_list = widgets.Select(
-            options=list_of_default_options,
-            rows=10,
-            disabled=False,
-            layout={'width': '95%'}
-        )
-
         self.result_text = widgets.HTML()
 
-        @yield_for_change(self.concept_list, 'value')
-        def concept_list_watcher():
-            for _ in range(sys.maxsize ** 10):
-                x = yield
-                if x:
-                    node = self.api.tree_dict.get(x)
-                    self.target(node.get('conceptCode'))
-
-                    d = {
-                        'path': node.get('conceptPath'),
-                        'type_': node.get('type'),
-                        'study_id': node.get('studyId'),
-                        'name': node.get('name'),
-                        'metadata': node.get('metadata')
-                    }
-
-                    self.result_text.value = self.table_template.format(**d)
-
-        @yield_for_change(self.search_bar, 'value')
-        def search_watcher():
-            for _ in range(sys.maxsize ** 10):
-                x = yield
-                if len(x) > 2:
-                    self.concept_list.options = self.api.search_tree_node(x, limit=100)
-                    self.result_count.value = self.result_count_template.format(len(self.concept_list.options))
-
-                else:
-                    self.concept_list.options = list_of_default_options
-                    self.result_count.value = self.result_count_template.format(no_filter_len)
-
-        concept_list_watcher()
-        search_watcher()
+        self.search_bar = self._build_search_bar()
+        self.concept_list = self._build_concept_list()
 
         self.concept_picker = VBox([
                 HBox([self.search_bar, self.result_count]),
                 self.concept_list,
                 self.result_text])
+
+    def _build_search_bar(self):
+        def search_watcher(change):
+            x = change.get('new')
+            if len(x) > 2:
+                self.concept_list.options = self.api.search_tree_node(x, limit=100)
+                self.result_count.value = self.result_count_template.format(len(self.concept_list.options))
+
+            else:
+                self.concept_list.options = self.list_of_default_options
+                self.result_count.value = self.result_count_template.format(self.no_filter_len)
+
+        search_bar = widgets.Text(placeholder='Type something')
+        search_bar.observe(search_watcher, 'value')
+        return search_bar
+
+    def _build_concept_list(self):
+        def concept_list_watcher(change):
+            x = change.get('new')
+            if x:
+                node = self.api.tree_dict.get(x)
+                try:
+                    self.target(node.get('constraint'))
+                except ValueError:
+                    pass
+
+                d = {
+                    'path': node.get('conceptPath'),
+                    'type_': node.get('type'),
+                    'study_id': node.get('studyId'),
+                    'name': node.get('name'),
+                    'metadata': node.get('metadata')
+                }
+
+                self.result_text.value = self.table_template.format(**d)
+
+        concept_list = widgets.Select(
+            options=self.list_of_default_options,
+            rows=10,
+            disabled=False,
+            continous_update=False,
+            layout={'width': '95%'}
+        )
+
+        concept_list.observe(concept_list_watcher, 'value')
+        return concept_list
 
     def get(self):
         return self.concept_picker
@@ -150,10 +127,59 @@ class ConceptPicker:
 
 class ConstraintWidget:
 
+    html_style = """
+        <style>
+            .widget-readout {
+                width: 210px;
+            }
+            .widget-readout .overflow {
+                width: 210px;
+            }
+            .widget-hslider .slider-container{
+                max-width: 35%;
+            }
+        </style>
+        """
+
     def __init__(self, observation_constraint):
         self.constraint = observation_constraint
+        self.numeric_range = self._build_numeric_range()
+        self.categorical_select = self._build_categorical_select()
 
-        self.numeric_range = widgets.FloatRangeSlider(
+        def update_date_attr(attr):
+            def observer(change):
+                date = change.get('new').isoformat()
+                setattr(self.constraint, attr, date)
+            return observer, 'value'
+
+        self.start_date_since = widgets.DatePicker(
+            description='Start date:')
+
+        self.start_date_before = widgets.DatePicker(
+            description='through',
+            style={'description_width': '50px'})
+
+        self.start_date_since.observe(*update_date_attr('min_start_date'))
+        self.start_date_before.observe(*update_date_attr('max_start_date'))
+        self.start_date_box = HBox([self.start_date_since, self.start_date_before])
+
+        self.constraint_details = VBox([
+            self.numeric_range,
+            self.categorical_select,
+            self.start_date_box
+        ])
+
+        self.set_initial()
+
+    def _build_numeric_range(self):
+        def numeric_range_watcher(change):
+            x = change.get('new')
+            min_ = x[0] if not math.isclose(x[0], numeric_range.min) else None
+            max_ = x[1] if not math.isclose(x[1], numeric_range.max) else None
+            self.constraint.min_value = min_
+            self.constraint.max_value = max_
+
+        numeric_range = widgets.FloatRangeSlider(
             value=(5.5, 7.5),
             min=0.0,
             max=10.0,
@@ -162,63 +188,28 @@ class ConstraintWidget:
             orientation='horizontal',
             readout=True,
             readout_format='.2f',
+            layout={'width': '95%'}
         )
 
-        @yield_for_change(self.numeric_range, 'value')
-        def numeric_range_watcher():
-            for i in range(sys.maxsize ** 10):
-                x = yield
-                if len(x) == 2:
-                    min_ = float(x[0])
-                    max_ = float(x[1])
-                    if min_ is not None and not math.isclose(min_, float(self.numeric_range.min)):
-                        self.constraint.min_value = min_
-                    else:
-                        self.constraint.min_value = None
+        numeric_range.observe(numeric_range_watcher, 'value')
+        return numeric_range
 
-                    if max_ is not None and not math.isclose(max_, float(self.numeric_range.max)):
-                        self.constraint.max_value = max_
-                    else:
-                        self.constraint.max_value = None
+    def _build_categorical_select(self):
+        def categorical_select_watcher(change):
+            x = list(change.get('new')) or None
+            self.constraint.value_list = x
 
-        self.categorical_select = widgets.SelectMultiple(
+        categorical_select = widgets.SelectMultiple(
             options=[],
-            description='Values',
-        )
+            description='Values')
 
-        @yield_for_change(self.categorical_select, 'value')
-        def categorical_select_watcher():
-            for i in range(sys.maxsize ** 10):
-                x = yield
-                if len(x):
-                    self.constraint.value_list = list(x)
-                else:
-                    self.constraint.value_list = None
-
-        numeric_range_watcher()
-        categorical_select_watcher()
-
-        self.start_date_since = widgets.DatePicker(
-            description='Start date:',
-            disabled=False
-        )
-
-        self.start_date_before = widgets.DatePicker(
-            description='through',
-            disabled=False
-        )
-
-        self.constraint_details = VBox([
-            self.numeric_range,
-            self.categorical_select,
-            HBox([self.start_date_since, self.start_date_before])
-        ])
-
-        self.set_initial()
+        categorical_select.observe(categorical_select_watcher, 'value')
+        return categorical_select
 
     def set_initial(self):
         widget_off(self.numeric_range)
         widget_off(self.categorical_select)
+        # widget_off(self.start_date_box)
 
     def set_numerical(self):
         widget_off(self.categorical_select)
@@ -247,4 +238,5 @@ class ConstraintWidget:
             self.set_initial()
 
     def get(self):
+        display(HTML(self.html_style))
         return self.constraint_details
