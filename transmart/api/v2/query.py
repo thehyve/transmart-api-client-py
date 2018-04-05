@@ -4,6 +4,7 @@
 * version 3.
 """
 import json
+import arrow
 
 from .query_widgets import ConceptPicker, ConstraintWidget
 
@@ -176,74 +177,6 @@ class Constraint:
         return {'type': self.type_, self.val_name: self.value}
 
 
-class FieldConstraint:
-    def __init__(self, value):
-        self.value = value
-
-    @property
-    def type_(self):
-        raise NotImplementedError
-
-    @property
-    def dimension(self):
-        raise NotImplementedError
-
-    @property
-    def fieldName(self):
-        raise NotImplementedError
-
-    @property
-    def operator(self):
-        raise NotImplementedError
-
-    def __str__(self):
-        return json.dumps(self.json())
-
-    def json(self):
-        return {'type': 'field',
-                'field': {
-                    'dimension': self.dimension,
-                    'fieldName': self.fieldName,
-                    'type': self.type_},
-                'operator': self.operator,
-                'value': self.value}
-
-
-class ValueConstraint:
-
-    def __init__(self, value):
-        self.value = value
-
-    @property
-    def value_type_(self):
-        raise NotImplementedError
-
-    @property
-    def operator(self):
-        raise NotImplementedError
-
-    def json(self):
-        return {'type': 'value',
-                'valueType': self.value_type_,
-                'operator': self.operator,
-                'value': self.value}
-
-
-class ValueListConstraint(ValueConstraint):
-    value_type_ = 'STRING'
-    operator = 'in'
-
-
-class MinValueConstraint(ValueConstraint):
-    value_type_ = 'NUMERIC'
-    operator = '>='
-
-
-class MaxValueConstraint(ValueConstraint):
-    value_type_ = 'NUMERIC'
-    operator = '<='
-
-
 class StudyConstraint(Constraint):
     type_ = 'study_name'
     val_name = 'studyId'
@@ -280,22 +213,101 @@ class GenesConstraint(BiomarkerConstraint):
     type_ = 'genes'
 
 
-class TrialVisitConstraint(FieldConstraint):
-    type_ = 'NUMERIC'
-    dimension = 'trial visit'
-    fieldName = 'id'
-    operator = 'in'
+class ValueConstraint:
+
+    def __init__(self, value):
+        self.value = value
+
+    @property
+    def value_type_(self):
+        raise NotImplementedError
+
+    @property
+    def operator(self):
+        raise NotImplementedError
+
+    def json(self):
+        return {'type': 'value',
+                'valueType': self.value_type_,
+                'operator': self.operator,
+                'value': self.value}
 
 
-class StartTimeBeforeConstraint(FieldConstraint):
-    type_ = 'DATE'
-    dimension = 'start time'
-    fieldName = 'startDate'
+class MinValueConstraint(ValueConstraint):
+    value_type_ = 'NUMERIC'
+    operator = '>='
+
+
+class MaxValueConstraint(ValueConstraint):
+    value_type_ = 'NUMERIC'
+    operator = '<='
+
+
+class ValueListConstraint(ValueConstraint):
+    value_type_ = 'STRING'
+    operator = '='
+
+    def json(self):
+        return {'type': 'or',
+                'args': [
+                    {'type': 'value',
+                     'valueType': self.value_type_,
+                     'operator': self.operator,
+                     'value': value}
+                    for value in self.value]
+                }
+
+
+class TrialVisitConstraint:
+
+    def __init__(self, values):
+        self.values = values if isinstance(values, list) else [values]
+
+    def __str__(self):
+        return json.dumps(self.json())
+
+    def json(self):
+        return {'type': 'or',
+                'args': [
+                    {'type': 'field',
+                     'field': {
+                         'dimension': 'trial visit',
+                         'fieldName': 'id',
+                         'type': 'NUMERIC'},
+                     'operator': '=',
+                     'value': value}
+                    for value in self.values]
+                }
+
+
+class StartTimeConstraint:
+    operator = '<-->'
+    n_dates = 2
+
+    def __init__(self, values):
+        self.values = values if isinstance(values, list) else [values]
+        if len(self.values) != self.n_dates:
+            raise ValueError('Expected {} dates, but got {}, for {!r}.'.
+                             format(self.n_dates, len(self.values), self.__class__))
+
+    def json(self):
+        return {'type': 'time',
+                'field': {
+                    'dimension': 'start time',
+                    'fieldName': 'startDate',
+                    'type': 'DATE'},
+                'operator': self.operator,
+                'values': [arrow.get(d).isoformat() for d in self.values]}
+
+
+class StartTimeBeforeConstraint(StartTimeConstraint):
     operator = '<-'
+    n_dates = 1
 
 
-class StartTimeAfterConstraint(StartTimeBeforeConstraint):
+class StartTimeAfterConstraint(StartTimeConstraint):
     operator = '->'
+    n_dates = 1
 
 
 class ObservationConstraint:
@@ -427,17 +439,20 @@ class ObservationConstraint:
 
         return {'constraint': constraint}
 
-    def subselect(self, dimension='patients'):
+    def subselect(self, dimension='patient', top_level=False):
         """
         Query that represents all dimension elements that adhere to the
         observation constraints, e.g. all patients that have observations
         for which the criteria apply.
 
         :param dimension: only patients is supported for now.
+        :param top_level: set to True to wrap subselect in {'constraint': <dict>}.
         :return:
         """
         d = {'type': 'subselection', 'dimension': dimension}
         d.update(self.json())
+        if top_level:
+            d = {'constraint': d}
         return d
 
     @property
@@ -549,7 +564,7 @@ class ObservationConstraint:
                     setattr(self, kw[0], c.get(kw[1]))
 
         if self.api is not None:
-            self.fetch_updates()
+            self._fetch_updates()
 
     def _dimension_elements_watcher(self):
 
@@ -570,7 +585,7 @@ class ObservationConstraint:
 
         return DictWatcher()
 
-    def fetch_updates(self):
+    def _fetch_updates(self):
 
         if self.api is not None and self.api.interactive:
             agg_response = self.api.aggregates_per_concept(self)
@@ -597,6 +612,9 @@ class GroupConstraint:
     def __init__(self, items, group_type):
         self.items = items
         self.group_type = group_type
+
+    def __str__(self):
+        return json.dumps(self.json())
 
     def __repr__(self):
         return '{}({})'.format(self.group_type, self.items)
@@ -629,9 +647,8 @@ class GroupConstraint:
 
     def json(self):
         return {
-          'type': 'subselection',
-          'dimension': 'patient',
-          'constraint': {
-            "type": self.group_type,
-            "args": [item.subselect() for item in self.items]}
+            'constraint': {
+                'type': self.group_type,
+                'args': [item.subselect() for item in self.items]
+            }
         }
