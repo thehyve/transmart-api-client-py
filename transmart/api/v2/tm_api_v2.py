@@ -68,22 +68,21 @@ class TransmartV2(TransmartAPIBase):
 
         return r.json()
 
-    def get_observations(self, study=None, patient_set=None, concept=None, operator="and", as_dataframe=False):
+    def get_observations(self, constraint=None, as_dataframe=False, **kwargs):
         """
         Get observations, from the main table in the transmart data model.
 
-        :param study: studyID
-        :param patient_set: patient set id
+        :param constraint: Constraint object. If left None, any keyword arguments
+           are added to the constraint.
         :param as_dataframe: If True, convert json response to dataframe directly
-        :return: dataframe or ObservationSet object
+        :return: dataframe or direct json
         """
+        if constraint is None:
+            constraint = ObservationConstraint(**kwargs)
 
-        q = Query(handle='/v2/observations',
-                  params={"type": "clinical"},
-                  in_study=study,
-                  in_patientset=patient_set,
-                  in_concept=concept,
-                  operator=operator)
+        q = Query(handle='/v2/observations')
+        q._params = {'type': 'clinical',
+                     'constraint': json.dumps(constraint.json().get('constraint'))}
 
         observations = ObservationSet(self.query(q))
 
@@ -92,16 +91,20 @@ class TransmartV2(TransmartAPIBase):
 
         return observations
 
-    def get_patients(self, study=None, patient_set=None, as_dataframe=False):
+    def get_patients(self, constraint=None, as_dataframe=False, **kwargs):
         """
         Get patients.
 
-        :param study: studyID
-        :param patient_set: patient set id
+        :param constraint: Constraint object. If left None, any keyword arguments
+           are added to the constraint.
         :param as_dataframe: If True, convert json response to dataframe directly
         :return: dataframe or direct json
         """
-        q = Query(handle='/v2/patients', in_study=study, in_patientset=patient_set)
+
+        if constraint is None:
+            constraint = ObservationConstraint(**kwargs)
+
+        q = Query(handle='/v2/patients', method='POST', json=constraint.json())
 
         patients = self.query(q)
 

@@ -6,6 +6,7 @@
 import json
 import arrow
 
+from functools import wraps
 from .query_widgets import ConceptPicker, ConstraintWidget
 
 
@@ -19,15 +20,17 @@ def input_check(types):
     :return: decorator that validates input of property setter.
     """
     if not isinstance(types, tuple):
-        raise ValueError('Input check types has to be tuple, got {!r}'.format(type(types)))
+        msg = 'Input check types has to be tuple, got {!r}'.format(type(types))
+        raise ValueError(msg)
 
     def input_check_decorator(func):
+        @wraps(func)
         def wrapper(self, value):
 
             if value is not None:
                 if type(value) not in types:
                     raise ValueError('Expected type {!r} for {!r}, but got {!r}'.
-                                     format(types, func, type(value)))
+                                     format(types, func.__name__, type(value)))
             return func(self, value)
         return wrapper
     return input_check_decorator
@@ -39,16 +42,22 @@ def bind_widget_tuple(target, pos):
     :param pos: position in tuple.
     """
     def bind_decorator(func):
+        @wraps(func)
         def wrapper(self, value):
-            if value is not None:
-                w = getattr(self._details_widget, target)
-                with w.hold_sync():
+            try:
+                if value is not None:
+                    w = getattr(self._details_widget, target)
+                    with w.hold_sync():
 
-                    state = list(w.value)
-                    state[pos] = value
-                    w.value = tuple(state)
+                        state = list(w.value)
+                        state[pos] = value
+                        w.value = tuple(state)
 
-            return func(self, value)
+            except AttributeError:
+                pass
+
+            finally:
+                return func(self, value)
         return wrapper
     return bind_decorator
 
@@ -56,16 +65,20 @@ def bind_widget_tuple(target, pos):
 def bind_widget_list(target):
     """
     :param target: widget to bind to.
-    :param pos: position in tuple.
     """
     def bind_decorator(func):
+        @wraps(func)
         def wrapper(self, value):
-            w = getattr(self._details_widget, target)
-            with w.hold_sync():
+            try:
+                w = getattr(self._details_widget, target)
+                with w.hold_sync():
+                    w.value = () if value is None else tuple(value)
 
-                w.value = () if value is None else tuple(value)
+            except AttributeError:
+                pass
 
-            return func(self, value)
+            finally:
+                return func(self, value)
         return wrapper
     return bind_decorator
 
@@ -73,14 +86,14 @@ def bind_widget_list(target):
 class Query:
     """ Utility to build queries for transmart v2 api. """
 
-    def __init__(self, handle=None, method='GET', params=None, hal=False,
+    def __init__(self, handle=None, method='GET', params=None, hal=False, json=None,
                  in_study=None, in_patientset=None, in_concept=None, in_gene_list=None,
                  in_transcript_list=None, operator="and"):
         self.handle = handle
         self.method = method
         self.hal = hal
         self._params = params or {}
-        self.json = None
+        self.json = json
         self.in_concept = in_concept
 
         # Operator for constraints, default is and
@@ -101,8 +114,8 @@ class Query:
 
     @params.getter
     def params(self):
-        self._params.update(self.get_constraints())
-        self._params.update(self.get_biomarker_constraints())
+        # self._params.update(self.get_constraints())
+        # self._params.update(self.get_biomarker_constraints())
         return self._params
 
     @property
@@ -119,7 +132,7 @@ class Query:
                 constraints.append(c.json())
 
         if len(constraints) > 1:
-            constraints = {'constraint': json.dumps({"type" : self.operator, "args": constraints})}
+            constraints = {'constraint': json.dumps({"type": self.operator, "args": constraints})}
         elif len(constraints) == 1:
             if self.handle == "/v2/patient_sets":
                 constraints = {'constraint': constraints[0]}
