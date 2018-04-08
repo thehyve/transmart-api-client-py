@@ -5,16 +5,28 @@
 """
 
 import logging
+from urllib.parse import unquote_plus
 
 import requests
+from functools import wraps
 from pandas.io.json import json_normalize
 
 from .concept_search import ConceptSearcher
 from .data_structures import ObservationSet, ObservationSetHD, TreeNodes, PatientSets, Studies, StudyList
-from .query import Query, ObservationConstraint
+from .query import Query, ObservationConstraint, Queryable, BiomarkerConstraint
 from ..tm_api_base import TransmartAPIBase
 
 logger = logging.getLogger('tm-api')
+
+
+def default_constraint(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if kwargs.get('constraint') is None:
+            if not any([isinstance(o, Queryable) for o in args]):
+                kwargs['constraint'] = ObservationConstraint(**kwargs)
+        return func(*args, **kwargs)
+    return wrapper
 
 
 class TransmartV2(TransmartAPIBase):
@@ -63,10 +75,11 @@ class TransmartV2(TransmartAPIBase):
             r = requests.post(url, json=q.json, params=q.params, headers=headers)
 
         if self.print_urls:
-            print(r.url)
+            print(unquote_plus(r.url))
 
         return r.json()
 
+    @default_constraint
     def get_observations(self, constraint=None, as_dataframe=False, **kwargs):
         """
         Get observations, from the main table in the transmart data model.
@@ -76,12 +89,11 @@ class TransmartV2(TransmartAPIBase):
         :param as_dataframe: If True, convert json response to dataframe directly
         :return: dataframe or direct json
         """
-        if constraint is None:
-            constraint = ObservationConstraint(**kwargs)
-
-        q = Query(handle='/v2/observations')
-        q._params = {'type': 'clinical',
-                     'constraint': str(constraint)}
+        q = Query(handle='/v2/observations',
+                  params=dict(
+                      type='clinical',
+                      constraint=str(constraint))
+                  )
 
         observations = ObservationSet(self.query(q))
 
@@ -90,6 +102,7 @@ class TransmartV2(TransmartAPIBase):
 
         return observations
 
+    @default_constraint
     def get_patients(self, constraint=None, as_dataframe=False, **kwargs):
         """
         Get patients.
@@ -99,10 +112,6 @@ class TransmartV2(TransmartAPIBase):
         :param as_dataframe: If True, convert json response to dataframe directly
         :return: dataframe or direct json
         """
-
-        if constraint is None:
-            constraint = ObservationConstraint(**kwargs)
-
         q = Query(handle='/v2/patients', method='POST', json={'constraint': constraint.json()})
 
         patients = self.query(q)
@@ -111,26 +120,30 @@ class TransmartV2(TransmartAPIBase):
             patients = json_normalize(patients['patients'])
         return patients
 
-    def create_patient_set(self, name, concept, operator=None):
-        """
-        Create a patient set with one concept as filter.
+    def get_patient_sets(self, patient_set_id=None):
+        q = Query(handle='/v2/patient_sets')
 
-        :param name: Name of the patient set
-        :param constraint: Concept path or code for which the patients should have an observation
+        if patient_set_id:
+            q.handle += '/{}'.format(patient_set_id)
+
+        return PatientSets(self.query(q))
+
+    @default_constraint
+    def create_patient_set(self, name, constraint=None, **kwargs):
+        """
+        Create a patient set that can be reused at a later stage.
+
+        :param name: name of the patient set to create.
+        :param constraint: observation constraints to use in query.
         :return: direct json
         """
         q = Query(handle='/v2/patient_sets',
                   method="POST",
                   params={"name": name},
-                  in_concept=concept,
-                  operator=operator)
+                  json=constraint.json()
+                  )
 
-        q.json = q.params.get("constraint")
-        del q.params['constraint']
-        q.headers['content-type'] = 'application/json'
-
-        result = self.query(q)
-        return result
+        return self.query(q)
 
     def get_studies(self, as_dataframe=False):
         """
@@ -152,7 +165,7 @@ class TransmartV2(TransmartAPIBase):
 
         return studies
 
-    def get_concepts(self):
+    def get_concepts(self, **kwargs):
         q = Query(handle='/v2/concepts')
         return json_normalize(self.query(q).get('concepts'))
 
@@ -179,58 +192,48 @@ class TransmartV2(TransmartAPIBase):
 
         return tree_nodes
 
-    def get_patient_sets(self):
-        q = Query(handle='/v2/patient_sets')
-        return PatientSets(self.query(q))
-
-    def get_hd_node_data(self, study=None, hd_type='autodetect', genes=None, transcripts=None, concept=None,
-                         patient_set=None, projection='all_data', operator="and"):
+    @default_constraint
+    def get_hd_node_data(self, constraint=None, biomarker_constraint=None, biomarkers: list=None,
+                         biomarker_type='genes', projection='all_data', **kwargs):
         """
-        :param study:
-        :param hd_type:
-        :param genes:
-        :param transcripts:
-        :param concept:
-        :param patient_set:
+        :param constraint:
+        :param biomarker_constraint:
+        :param biomarkers: list of markers to get.
+        :param biomarker_type: ['genes', 'transcripts']
         :param projection: ['all_data', 'zscore', 'log_intensity']
-        :param operator: ['and', 'or']
         :return:
         """
+        if biomarker_constraint is None:
+            biomarker_constraint = BiomarkerConstraint(biomarkers=biomarkers,
+                                                       biomarker_type=biomarker_type)
 
         q = Query(handle='/v2/observations',
-                  method='POST',
-                  params={'type': hd_type,
-                          'projection': projection},
-                  in_study=study,
-                  in_patientset=patient_set,
-                  in_concept=concept,
-                  operator=operator,
-                  in_gene_list=genes,
-                  in_transcript_list=transcripts
+                  method='GET',
+                  params=dict(
+                      type='autodetect',
+                      projection=projection,
+                      constraint=str(constraint),
+                      biomarker_constraint=str(biomarker_constraint))
                   )
-        q.json = q.params
-        q._params = {}
 
         return ObservationSetHD(self.query(q))
 
-    def aggregates_per_concept(self, obs_constraint=None):
+    @default_constraint
+    def aggregates_per_concept(self, constraint=None, **kwargs):
         q = Query(handle='/v2/observations/aggregates_per_concept',
-                  method='POST')
-
-        if obs_constraint is None:
-            obs_constraint = ObservationConstraint()
-
-        q.json = {'constraint': obs_constraint.json()}
+                  method='POST',
+                  json={'constraint': constraint.json()}
+                  )
         return self.query(q)
 
-    def dimension_elements(self, dimension=None, constraint=None):
-
-        if constraint is None:
-            constraint = ObservationConstraint()
-
+    @default_constraint
+    def dimension_elements(self, constraint=None, dimension=None, **kwargs):
         q = Query(handle='/v2/dimensions/{}/elements'.format(dimension),
-                  method='GET')
-        q._params = {'constraint': str(constraint)}
+                  method='GET',
+                  params=dict(
+                      constraint=str(constraint))
+                  )
+
         return self.query(q)
 
     def new_constraint(self, *args, **kwargs):
