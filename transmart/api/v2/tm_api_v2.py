@@ -4,7 +4,6 @@
 * version 3.
 """
 
-import json
 import logging
 
 import requests
@@ -82,7 +81,7 @@ class TransmartV2(TransmartAPIBase):
 
         q = Query(handle='/v2/observations')
         q._params = {'type': 'clinical',
-                     'constraint': json.dumps(constraint.json().get('constraint'))}
+                     'constraint': str(constraint)}
 
         observations = ObservationSet(self.query(q))
 
@@ -104,7 +103,7 @@ class TransmartV2(TransmartAPIBase):
         if constraint is None:
             constraint = ObservationConstraint(**kwargs)
 
-        q = Query(handle='/v2/patients', method='POST', json=constraint.json())
+        q = Query(handle='/v2/patients', method='POST', json={'constraint': constraint.json()})
 
         patients = self.query(q)
 
@@ -221,20 +220,17 @@ class TransmartV2(TransmartAPIBase):
         if obs_constraint is None:
             obs_constraint = ObservationConstraint()
 
-        q.json = obs_constraint.json()
+        q.json = {'constraint': obs_constraint.json()}
         return self.query(q)
 
-    def dimension_elements(self, dimension=None, obs_constraint=None):
+    def dimension_elements(self, dimension=None, constraint=None):
 
-        if obs_constraint is None:
-            obs_constraint = ObservationConstraint()
+        if constraint is None:
+            constraint = ObservationConstraint()
 
         q = Query(handle='/v2/dimensions/{}/elements'.format(dimension),
                   method='GET')
-
-        # Requests library has no standard for marshalling nested dicts for GET methods.
-        # So here we have to create a string of the nested query.
-        q._params = {'constraint': json.dumps(obs_constraint.json().get('constraint'))}
+        q._params = {'constraint': str(constraint)}
         return self.query(q)
 
     def new_constraint(self, *args, **kwargs):

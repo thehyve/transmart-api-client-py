@@ -2,7 +2,7 @@ import math
 
 import ipywidgets as widgets
 from IPython.display import HTML, display
-from ipywidgets import VBox, HBox, Box
+from ipywidgets import VBox, HBox
 import arrow
 
 
@@ -24,7 +24,7 @@ class ConceptPicker:
 
     result_count_template = 'Number of entries: {}'
     table_template = """
-    <div class="rendered_html" style="width: 95%;">
+    <div class="rendered_html jp-RenderedHTMLCommon" style="width: 95%;">
 
         <table border="1" class="dataframe" style="width: 100%;">
             <colgroup>

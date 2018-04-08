@@ -349,6 +349,7 @@ class ObservationConstraint:
                  value_list=None,
                  min_start_date=None,
                  max_start_date=None,
+                 subselection=None,
                  api=None):
         """
         Represents constraints on observation level. This is the set of
@@ -363,6 +364,8 @@ class ObservationConstraint:
         :param max_value:
         :param min_start_date:
         :param max_start_date:
+        :param subselection:
+        :param api:
         """
 
         self.__concept = None
@@ -372,6 +375,7 @@ class ObservationConstraint:
         self.__max_value = None
         self.__min_start_date = None
         self.__max_start_date = None
+        self.__subselection = None
         self._dimension_elements = None
         self._aggregates = None
 
@@ -388,6 +392,7 @@ class ObservationConstraint:
         self.max_value = max_value
         self.min_start_date = min_start_date
         self.max_start_date = max_start_date
+        self.subselection = subselection
 
     def __len__(self):
         len_ = 0
@@ -450,23 +455,29 @@ class ObservationConstraint:
         else:
             constraint = args.pop()
 
-        return {'constraint': constraint}
+        if self.subselection is not None:
+            return dict(type='subselection',
+                        dimension=self.subselection,
+                        constraint=constraint)
 
-    def subselect(self, dimension='patient', top_level=False):
+        return constraint
+
+    def subselect(self, dimension='patient'):
         """
         Query that represents all dimension elements that adhere to the
         observation constraints, e.g. all patients that have observations
         for which the criteria apply.
 
         :param dimension: only patients is supported for now.
-        :param top_level: set to True to wrap subselect in {'constraint': <dict>}.
-        :return:
+        :return: criteria dictionary.
         """
-        d = {'type': 'subselection', 'dimension': dimension}
-        d.update(self.json())
-        if top_level:
-            d = {'constraint': d}
-        return d
+        current = self.subselection
+        try:
+            self.subselection = dimension
+            return self.json()
+
+        finally:
+            self.subselection = current
 
     @property
     def trial_visit(self):
@@ -546,6 +557,15 @@ class ObservationConstraint:
     def min_start_date(self, value):
         self.__min_start_date = value
 
+    @property
+    def subselection(self):
+        return self.__subselection
+
+    @subselection.setter
+    @input_check((str, ))
+    def subselection(self, value):
+        self.__subselection = value
+
     def apply_tree_node_constraints(self, constraints):
         """
         Reset current argument and apply those from a tree node constraints dict.
@@ -601,7 +621,8 @@ class ObservationConstraint:
     def _fetch_updates(self):
 
         if self.api is not None and self.api.interactive:
-            agg_response = self.api.aggregates_per_concept(self)
+            c = self.__class__(concept=self.concept, study=self.study)
+            agg_response = self.api.aggregates_per_concept(c)
             self._aggregates = agg_response.get('aggregatesPerConcept', {}).get(self.concept, {})
 
             self._details_widget.set_initial()
