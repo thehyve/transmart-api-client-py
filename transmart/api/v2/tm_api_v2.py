@@ -59,7 +59,7 @@ class TransmartV2(TransmartAPIBase):
         full_tree = self.tree_nodes()
         self.tree_dict = full_tree.tree_dict
 
-        self.search_tree_node = ConceptSearcher(self.tree_dict).search
+        self.search_tree_node = ConceptSearcher(self.tree_dict, full_tree.identity).search
 
     def query(self, q):
         """ Perform query using API client using a Query object """
@@ -169,7 +169,7 @@ class TransmartV2(TransmartAPIBase):
         q = Query(handle='/v2/concepts')
         return json_normalize(self.query(q).get('concepts'))
 
-    def tree_nodes(self, root=None, depth=0, counts=True, tags=True, hal=False):
+    def tree_nodes(self, root=None, depth=0, counts=False, tags=True, hal=False):
         """
         Return the tree hierarchy
 

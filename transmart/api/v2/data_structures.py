@@ -1,4 +1,5 @@
 from pandas.io.json import json_normalize
+from ..commons import get_dict_identity
 
 
 def _format_observations(observations_result):
@@ -103,6 +104,7 @@ class TreeNodes:
 
     def __init__(self, json):
         self.json = json
+        self.identity = get_dict_identity(self.json, fields=['children', 'tree_nodes', 'conceptPath'])
         self.dataframe = json_normalize(self.create_list())
         self.tree_dict = self.create_tree_dict()
 
