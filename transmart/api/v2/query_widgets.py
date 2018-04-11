@@ -1,10 +1,9 @@
 import math
 
+import arrow
 import ipywidgets as widgets
 from IPython.display import HTML, display
 from ipywidgets import VBox, HBox
-import arrow
-
 
 AGG_NUM = 'numericalValueAggregates'
 AGG_CAT = 'categoricalValueAggregates'

@@ -1,7 +1,8 @@
-from whoosh.qparser import MultifieldParser, FuzzyTermPlugin
-from whoosh.index import create_in
-from whoosh.fields import Schema, TEXT
 import os
+
+from whoosh.fields import Schema, TEXT
+from whoosh.index import create_in
+from whoosh.qparser import MultifieldParser, FuzzyTermPlugin
 
 
 class ConceptSearcher:

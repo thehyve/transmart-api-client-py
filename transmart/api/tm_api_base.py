@@ -24,24 +24,10 @@ class TransmartAPIBase:
         r = requests.post("{}/oauth/token".format(self.host),
                           params={'grant_type': 'password',
                                   'client_id': CLIENT_ID,
-                                  'username': self.user,
-                                  'password': password or getpass.getpass("Password: ")
-                                  })
+                                  'username': self.user},
+                          data={'password': password or getpass.getpass("Password: ")
+                                })
+
         r.raise_for_status()
 
         return r.json().get('access_token')
-
-    def get_observations(self, study=None, patientSet=None, as_dataframe=True):
-        raise NotImplementedError
-
-    def get_patients(self, study=None, patientSet=None, as_dataframe=True):
-        raise NotImplementedError
-
-    def get_studies(self, as_dataframe=True):
-        raise NotImplementedError
-
-    def get_concepts(self, study):
-        raise NotImplementedError
-
-    def get_hd_node_data(self, study, node_name, projection='all_data', genes=None):
-        raise NotImplementedError
