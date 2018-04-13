@@ -4,9 +4,10 @@
 * version 3.
 """
 import json
-import arrow
 
+import arrow
 from functools import wraps
+
 from .query_widgets import ConceptPicker, ConstraintWidget
 
 
@@ -320,6 +321,7 @@ class ObservationConstraint(Queryable):
         self.__subselection = None
         self._dimension_elements = None
         self._aggregates = None
+        self.study = None
 
         self.api = api
 
@@ -563,11 +565,13 @@ class ObservationConstraint(Queryable):
     def _fetch_updates(self):
 
         if self.api is not None and self.api.interactive:
+            self._details_widget.set_initial()
+            self._details_widget.update_obs_repr()
+
             c = self.__class__(concept=self.concept, study=self.study)
             agg_response = self.api.aggregates_per_concept(c)
             self._aggregates = agg_response.get('aggregatesPerConcept', {}).get(self.concept, {})
 
-            self._details_widget.set_initial()
             self._details_widget.update_from_aggregates(self._aggregates)
 
             self._dimension_elements = self._dimension_elements_watcher()
@@ -623,8 +627,6 @@ class GroupConstraint(Queryable):
 
     def json(self):
         return {
-            'constraint': {
-                'type': self.group_type,
-                'args': [item.subselect() for item in self.items]
-            }
+            'type': self.group_type,
+            'args': [item.subselect() for item in self.items]
         }

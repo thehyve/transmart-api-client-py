@@ -8,6 +8,10 @@ from ipywidgets import VBox, HBox
 AGG_NUM = 'numericalValueAggregates'
 AGG_CAT = 'categoricalValueAggregates'
 
+MAX_OPTIONS = 100
+CONCEPT_DELAY = 2
+DEFAULT_VISIT = [{'relTimeLabel': 'General', 'id': 0}]
+
 
 def widget_on(widget):
     widget.layout.visibility = 'initial'
@@ -17,6 +21,13 @@ def widget_on(widget):
 def widget_off(widget):
     widget.layout.visibility = 'hidden'
     widget.layout.max_height = '0'
+
+
+def toggle_visibility(widget):
+    if widget.layout.max_height == '0':
+        widget_on(widget)
+    else:
+        widget_off(widget)
 
 
 class ConceptPicker:
@@ -64,27 +75,57 @@ class ConceptPicker:
         self.no_filter_len = len(self.list_of_default_options)
 
         self.result_count = widgets.HTML(
-            value=self.result_count_template.format(self.no_filter_len)
+            value=self.result_count_template.format(self.no_filter_len),
+            layout={'width': '175px'}
         )
         self.result_text = widgets.HTML()
 
         self.search_bar = self._build_search_bar()
         self.concept_list = self._build_concept_list()
 
-        self.concept_picker = VBox([
-                HBox([self.search_bar, self.result_count]),
-                self.concept_list,
-                self.result_text])
+        # Necessary output for Jlab
+        out = widgets.Output()
+
+        def confirm_tree_node(btn):
+            with out:
+                try:
+                    node = self.api.tree_dict.get(self.concept_list.value)
+                    self.target(node.get('constraint'))
+                except ValueError:
+                    pass
+
+        self._confirm = widgets.Button(description='Confirm', icon='check')
+        self._confirm.on_click(confirm_tree_node)
+
+        box_and_picker = VBox([
+            HBox([self.search_bar, self.result_count, self._confirm]),
+            self.concept_list,
+            self.result_text])
+
+        def toggle(btn):
+            btn.description = 'Show' if btn.description == 'Hide' else 'Hide'
+            with out:
+                toggle_visibility(box_and_picker)
+
+        self.toggle = widgets.Button(description='Hide')
+        self.toggle.on_click(toggle)
+
+        self.concept_picker = VBox([self.toggle, box_and_picker])
 
     def _build_search_bar(self):
         def search_watcher(change):
             x = change.get('new')
             if len(x) > 2:
-                self.concept_list.options = self.api.search_tree_node(x, limit=100)
-                self.result_count.value = self.result_count_template.format(len(self.concept_list.options))
+                self.concept_list.options = self.api.search_tree_node(x, limit=MAX_OPTIONS)
+                count = len(self.concept_list.options)
+
+                if count == MAX_OPTIONS:
+                    count = str(count) + '+'
+
+                self.result_count.value = self.result_count_template.format(count)
 
             else:
-                self.concept_list.options = self.list_of_default_options
+                self.concept_list.options = self.list_of_default_options[:MAX_OPTIONS]
                 self.result_count.value = self.result_count_template.format(self.no_filter_len)
 
         search_bar = widgets.Text(placeholder='Type something')
@@ -96,23 +137,19 @@ class ConceptPicker:
             x = change.get('new')
             if x:
                 node = self.api.tree_dict.get(x)
-                try:
-                    self.target(node.get('constraint'))
-                except ValueError:
-                    pass
-
+                metadata = dict(node.get('metadata', {}))
                 d = {
                     'path': node.get('conceptPath'),
                     'type_': node.get('type'),
                     'study_id': node.get('studyId'),
                     'name': node.get('name'),
-                    'metadata': node.get('metadata')
+                    'metadata': '<br> '.join(['{}: {}'.format(k, v) for k, v in metadata.items()])
                 }
 
                 self.result_text.value = self.table_template.format(**d)
 
         concept_list = widgets.Select(
-            options=self.list_of_default_options,
+            options=self.list_of_default_options[:MAX_OPTIONS],
             rows=10,
             disabled=False,
             continous_update=False,
@@ -168,12 +205,28 @@ class ConstraintWidget:
         self.start_date_before.observe(*update_date_attr('max_start_date'))
         self.start_date_box = HBox([self.start_date_since, self.start_date_before])
 
-        self.constraint_details = VBox([
+        detail_fields = VBox([
             self.numeric_range,
             self.categorical_select,
             self.trial_visit_select,
             self.start_date_box
-        ], layout={'height': '225px'})
+        ])
+
+        # Necessary output for Jlab
+        self.out = widgets.Output()
+
+        def toggle(btn):
+            btn.description = 'Show' if btn.description == 'Hide' else 'Hide'
+            with self.out:
+                toggle_visibility(detail_fields)
+
+        self.toggle = widgets.Button(description='Hide')
+        self.toggle.on_click(toggle)
+        self.obs_repr = widgets.HTML()
+
+        self.constraint_details = VBox([
+            HBox([self.toggle, self.obs_repr, self.out]),
+            detail_fields])
 
         self.set_initial()
 
@@ -215,6 +268,7 @@ class ConstraintWidget:
     def set_initial(self):
         widget_off(self.numeric_range)
         widget_off(self.categorical_select)
+        self.update_trial_visits(DEFAULT_VISIT)
         # widget_off(self.start_date_box)
 
     def set_numerical(self):
@@ -269,10 +323,16 @@ class ConstraintWidget:
         dates = [arrow.get(d).date() for d in dates if not d.startswith('000')]
         w1 = self.start_date_since
         w2 = self.start_date_before
-        w1.value = min(dates, default=None)
-        w2.value = max(dates, default=None)
         w1.disabled = w2.disabled = len(dates) < 2
 
+        w1.value = min(dates, default=None)
+        w2.value = max(dates, default=None)
+
+    def update_obs_repr(self):
+        self.obs_repr.value = '<div style="font-family:monospace;font-size:smaller;">{}</div>'.\
+            format(repr(self.constraint))
+
     def get(self):
-        display(HTML(self.html_style))
+        with self.out:
+            display(HTML(self.html_style))
         return self.constraint_details
