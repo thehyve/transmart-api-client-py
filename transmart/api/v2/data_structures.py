@@ -99,6 +99,9 @@ class StudyList:
         for study_id in study_list:
             self.__dict__[study_id.replace('-', '_')] = study_id
 
+    def __len__(self):
+        return len(self.__dict__.keys())
+
 
 class TreeNodes:
 
