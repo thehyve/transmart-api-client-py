@@ -1,3 +1,5 @@
+import time
+
 import os
 from whoosh.fields import Schema, TEXT, NGRAM
 from whoosh.index import create_in, exists_in, open_dir
@@ -17,7 +19,7 @@ class ConceptSearcher:
         with self.ix.searcher() as searcher:
             query = self.parser.parse(query_string)
             results = searcher.search(query, limit=limit,)
-            return [r['full_name'] for r in results]
+            return [r['fullname'] for r in results]
 
     def get_schema(self):
         user = os.path.expanduser('~')
@@ -31,7 +33,9 @@ class ConceptSearcher:
 
         else:
             print('No valid cache found. Building indexes...')
+            now = time.time()
             self.__build_whoosh_index(schema_dir)
+            print('Finished in {:.2f} seconds'.format(time.time() - now))
 
         self.parser = MultifieldParser(
             self.ix.schema.names(),
@@ -42,11 +46,11 @@ class ConceptSearcher:
 
         fields = dict(
             node=TEXT(),
-            full_name=TEXT(stored=True),
+            fullname=TEXT(stored=True),
             path=TEXT(),
-            type_=TEXT(),
-            study_id=NGRAM(field_boost=10.0),
-            name=NGRAM(field_boost=3.0),
+            type=TEXT(),
+            study=NGRAM(field_boost=10.0),
+            name=NGRAM(minsize=3, field_boost=3.0),
             metadata=TEXT(),
         )
         schema = Schema(**fields)
@@ -57,9 +61,9 @@ class ConceptSearcher:
                 writer.add_document(
                     node=key.replace('\\', ' ').replace('_', ' '),
                     path=value.get('conceptPath'),
-                    full_name=key,
-                    type_=value.get('type'),
-                    study_id=str(value.get('studyId')),
+                    fullname=key,
+                    type=value.get('type'),
+                    study=str(value.get('studyId')),
                     name=str(value.get('name')),
                     metadata=str(value.get('metadata'))
                 )
