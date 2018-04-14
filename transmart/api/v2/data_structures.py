@@ -159,7 +159,7 @@ class Patients:
 
     def __init__(self, json):
         self.json = json
-        self.dataframe = json_normalize(json)
+        self.dataframe = json_normalize(json.get('patients'))
 
 
 class PatientSets:

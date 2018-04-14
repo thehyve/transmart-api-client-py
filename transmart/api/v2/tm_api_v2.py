@@ -14,7 +14,7 @@ from pandas.io.json import json_normalize
 from .concept_search import ConceptSearcher
 from .data_structures import (ObservationSet, ObservationSetHD, TreeNodes, Patients,
                               PatientSets, Studies, StudyList, RelationTypes)
-from .query import Query, ObservationConstraint, Queryable, BiomarkerConstraint
+from .query_constraints import Query, ObservationConstraint, Queryable, BiomarkerConstraint
 from ..tm_api_base import TransmartAPIBase
 
 logger = logging.getLogger('tm-api')

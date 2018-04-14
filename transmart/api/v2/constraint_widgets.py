@@ -30,6 +30,17 @@ def toggle_visibility(widget):
         widget_off(widget)
 
 
+def create_toggle(widget, out):
+    def toggle(btn):
+        btn.description = 'Show' if btn.description == 'Hide' else 'Hide'
+        with out:
+            toggle_visibility(widget)
+
+    toggle_btn = widgets.Button(description='Hide')
+    toggle_btn.on_click(toggle)
+    return toggle_btn
+
+
 class ConceptPicker:
 
     result_count_template = 'Number of entries: {}'
@@ -97,20 +108,12 @@ class ConceptPicker:
         self._confirm = widgets.Button(description='Confirm', icon='check')
         self._confirm.on_click(confirm_tree_node)
 
-        box_and_picker = VBox([
+        self.box_and_picker = VBox([
             HBox([self.search_bar, self.result_count, self._confirm]),
             self.concept_list,
             self.result_text])
 
-        def toggle(btn):
-            btn.description = 'Show' if btn.description == 'Hide' else 'Hide'
-            with out:
-                toggle_visibility(box_and_picker)
-
-        self.toggle = widgets.Button(description='Hide')
-        self.toggle.on_click(toggle)
-
-        self.concept_picker = VBox([self.toggle, box_and_picker])
+        self.concept_picker = VBox([create_toggle(self.box_and_picker, out), self.box_and_picker])
 
     def _build_search_bar(self):
         def search_watcher(change):
@@ -205,7 +208,7 @@ class ConstraintWidget:
         self.start_date_before.observe(*update_date_attr('max_start_date'))
         self.start_date_box = HBox([self.start_date_since, self.start_date_before])
 
-        detail_fields = VBox([
+        self.detail_fields = VBox([
             self.numeric_range,
             self.categorical_select,
             self.trial_visit_select,
@@ -215,18 +218,14 @@ class ConstraintWidget:
         # Necessary output for Jlab
         self.out = widgets.Output()
 
-        def toggle(btn):
-            btn.description = 'Show' if btn.description == 'Hide' else 'Hide'
-            with self.out:
-                toggle_visibility(detail_fields)
-
-        self.toggle = widgets.Button(description='Hide')
-        self.toggle.on_click(toggle)
         self.obs_repr = widgets.HTML()
 
         self.constraint_details = VBox([
-            HBox([self.toggle, self.obs_repr, self.out]),
-            detail_fields])
+            HBox([
+                create_toggle(self.detail_fields, self.out),
+                self.obs_repr,
+                self.out]),
+            self.detail_fields])
 
         self.set_initial()
 

@@ -8,7 +8,7 @@ import json
 import arrow
 from functools import wraps
 
-from .query_widgets import ConceptPicker, ConstraintWidget
+from .constraint_widgets import ConceptPicker, ConstraintWidget
 
 
 class InvalidConstraint(Exception):
@@ -541,7 +541,7 @@ class ObservationConstraint(Queryable):
                     setattr(self, kw[0], c.get(kw[1]))
 
         if self.api is not None:
-            self._fetch_updates()
+            self.fetch_updates()
 
     def _dimension_elements_watcher(self):
 
@@ -568,21 +568,27 @@ class ObservationConstraint(Queryable):
             self._details_widget.set_initial()
             self._details_widget.update_obs_repr()
 
-            c = self.__class__(concept=self.concept, study=self.study)
-            agg_response = self.api.aggregates_per_concept(c)
+            agg_response = self.api.aggregates_per_concept(self)
             self._aggregates = agg_response.get('aggregatesPerConcept', {}).get(self.concept, {})
 
             self._details_widget.update_from_aggregates(self._aggregates)
 
             self._dimension_elements = self._dimension_elements_watcher()
             for dimension in ('trial visit', 'study', 'start time'):
-                self._dimension_elements[dimension] = self.api.dimension_elements(c, dimension).get('elements')
+                self._dimension_elements[dimension] = self.api.dimension_elements(self, dimension).get('elements')
 
-    def find_concept(self):
+    def find_concept(self, search_string=None):
+        """
+
+        :param search_string: Optionally pre-fill the search field
+        :return:
+        """
         if self.api is None:
             raise AttributeError('{}.api not set. Cannot be interactive.'.format(self.__class__))
 
-        return ConceptPicker(target=self.apply_tree_node_constraints, api=self.api).get()
+        cp = ConceptPicker(target=self.apply_tree_node_constraints, api=self.api)
+        cp.search_bar.value = search_string
+        return cp.get()
 
     def interact(self):
         return self._details_widget.get()
