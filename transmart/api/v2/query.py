@@ -562,7 +562,7 @@ class ObservationConstraint(Queryable):
 
         return DictWatcher()
 
-    def _fetch_updates(self):
+    def fetch_updates(self):
 
         if self.api is not None and self.api.interactive:
             self._details_widget.set_initial()
@@ -630,3 +630,24 @@ class GroupConstraint(Queryable):
             'type': self.group_type,
             'args': [item.subselect() for item in self.items]
         }
+
+
+class RelationConstraint(Queryable):
+
+    def __init__(self, constraint, type_label):
+        self.constraint = constraint
+        self.type_label = type_label
+
+    def json(self):
+        return {
+            "type": "subselection",
+            "dimension": "patient",
+            "constraint": {
+                "type": "relation",
+                "relatedSubjectsConstraint": self.constraint.json(),
+                "relationTypeLabel": self.type_label,
+            }
+        }
+
+    def subselect(self):
+        return self.json()

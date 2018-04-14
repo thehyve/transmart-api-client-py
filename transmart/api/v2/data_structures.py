@@ -155,9 +155,35 @@ class TreeNodes:
         return s
 
 
+class Patients:
+
+    def __init__(self, json):
+        self.json = json
+        self.dataframe = json_normalize(json)
+
+
 class PatientSets:
 
     def __init__(self, json):
         self.json = json
         self.dataframe = json_normalize(json.get('patientSets', json))
+
+
+class RelationTypes:
+
+    def __init__(self, json):
+        for entry in json.get('relationTypes'):
+            label = entry.get('label')
+            description = entry.get('description') or label
+
+            self.__dict__[description] = label
+
+    def __getitem__(self, item):
+        return self.__dict__[item]
+
+    def __setitem__(self, key, value):
+        self.__dict__[key] = value
+
+    def _ipython_key_completions_(self):
+        return list(self.__dict__.keys())
 

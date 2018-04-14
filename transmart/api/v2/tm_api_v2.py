@@ -12,7 +12,8 @@ from functools import wraps
 from pandas.io.json import json_normalize
 
 from .concept_search import ConceptSearcher
-from .data_structures import ObservationSet, ObservationSetHD, TreeNodes, PatientSets, Studies, StudyList
+from .data_structures import (ObservationSet, ObservationSetHD, TreeNodes, Patients,
+                              PatientSets, Studies, StudyList, RelationTypes)
 from .query import Query, ObservationConstraint, Queryable, BiomarkerConstraint
 from ..tm_api_base import TransmartAPIBase
 
@@ -46,6 +47,7 @@ class TransmartV2(TransmartAPIBase):
         self.studies = None
         self.tree_dict = None
         self.search_tree_node = None
+        self.relation_types = None
         self.interactive = interactive
 
         if interactive:
@@ -58,8 +60,10 @@ class TransmartV2(TransmartAPIBase):
         logger.debug('Caching full tree as tree_dict.')
         full_tree = self.tree_nodes()
         self.tree_dict = full_tree.tree_dict
-
         self.search_tree_node = ConceptSearcher(self.tree_dict, full_tree.identity).search
+
+        logger.debug('Getting subject relationship types.')
+        self.relation_types = RelationTypes(self.get_relation_types())
 
     def query(self, q):
         """ Perform query using API client using a Query object """
@@ -103,22 +107,16 @@ class TransmartV2(TransmartAPIBase):
         return observations
 
     @default_constraint
-    def get_patients(self, constraint=None, as_dataframe=False, **kwargs):
+    def get_patients(self, constraint=None, **kwargs):
         """
         Get patients.
 
         :param constraint: Constraint object. If left None, any keyword arguments
            are added to the constraint.
-        :param as_dataframe: If True, convert json response to dataframe directly
         :return: dataframe or direct json
         """
         q = Query(handle='/v2/patients', method='POST', json={'constraint': constraint.json()})
-
-        patients = self.query(q)
-
-        if as_dataframe:
-            patients = json_normalize(patients['patients'])
-        return patients
+        return Patients(self.query(q))
 
     def get_patient_sets(self, patient_set_id=None):
         q = Query(handle='/v2/patient_sets')
@@ -234,6 +232,10 @@ class TransmartV2(TransmartAPIBase):
                       constraint=str(constraint))
                   )
 
+        return self.query(q)
+
+    def get_relation_types(self):
+        q = Query(handle='/v2/pedigree/relation_types')
         return self.query(q)
 
     def new_constraint(self, *args, **kwargs):
