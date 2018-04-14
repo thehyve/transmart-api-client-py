@@ -14,6 +14,7 @@ DEFAULT_VISIT = [{'relTimeLabel': 'General', 'id': 0}]
 
 
 def widget_on(widget):
+    widget.disabled = False
     widget.layout.visibility = 'initial'
     widget.layout.max_height = None
 
@@ -263,6 +264,10 @@ class ConstraintWidget:
 
         w.observe(watcher, 'value')
         return w
+
+    def disable_all(self):
+        for child in self.detail_fields.children:
+            child.disabled = True
 
     def set_initial(self):
         widget_off(self.numeric_range)

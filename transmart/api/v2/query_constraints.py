@@ -10,6 +10,9 @@ from functools import wraps
 
 from .constraint_widgets import ConceptPicker, ConstraintWidget
 
+END_OF_DAY_FMT = 'YYYY-MM-DDT23:59:59ZZ'
+START_OF_DAY_FMT = 'YYYY-MM-DDT00:00:00ZZ'
+
 
 class InvalidConstraint(Exception):
     pass
@@ -233,6 +236,7 @@ class TrialVisitConstraint:
 class StartTimeConstraint:
     operator = '<-->'
     n_dates = 2
+    date_fmt = (START_OF_DAY_FMT, END_OF_DAY_FMT)
 
     def __init__(self, values):
         self.values = values if isinstance(values, list) else [values]
@@ -247,17 +251,19 @@ class StartTimeConstraint:
                     'fieldName': 'startDate',
                     'type': 'DATE'},
                 'operator': self.operator,
-                'values': [arrow.get(d).isoformat() for d in self.values]}
+                'values': [arrow.get(d).format(fmt) for d, fmt in zip(self.values, self.date_fmt)]}
 
 
 class StartTimeBeforeConstraint(StartTimeConstraint):
     operator = '<-'
     n_dates = 1
+    date_fmt = (END_OF_DAY_FMT, )
 
 
 class StartTimeAfterConstraint(StartTimeConstraint):
     operator = '->'
     n_dates = 1
+    date_fmt = (START_OF_DAY_FMT, )
 
 
 class Queryable:
@@ -565,7 +571,7 @@ class ObservationConstraint(Queryable):
     def fetch_updates(self):
 
         if self.api is not None and self.api.interactive:
-            self._details_widget.set_initial()
+            self._details_widget.disable_all()
             self._details_widget.update_obs_repr()
 
             agg_response = self.api.get_observations.aggregates_per_concept(self)
@@ -574,8 +580,8 @@ class ObservationConstraint(Queryable):
             self._details_widget.update_from_aggregates(self._aggregates)
 
             self._dimension_elements = self._dimension_elements_watcher()
-            for dimension in ('trial visit', 'study', 'start time'):
-                self._dimension_elements[dimension] = self.api.dimension_elements(self, dimension).get('elements')
+            for dimension in ('trial visit', 'start time'):
+                self._dimension_elements[dimension] = self.api.dimension_elements(dimension, self).get('elements')
 
     def find_concept(self, search_string: str=None):
         """
