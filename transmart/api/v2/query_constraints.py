@@ -568,7 +568,7 @@ class ObservationConstraint(Queryable):
             self._details_widget.set_initial()
             self._details_widget.update_obs_repr()
 
-            agg_response = self.api.aggregates_per_concept(self)
+            agg_response = self.api.get_observations.aggregates_per_concept(self)
             self._aggregates = agg_response.get('aggregatesPerConcept', {}).get(self.concept, {})
 
             self._details_widget.update_from_aggregates(self._aggregates)
@@ -577,7 +577,7 @@ class ObservationConstraint(Queryable):
             for dimension in ('trial visit', 'study', 'start time'):
                 self._dimension_elements[dimension] = self.api.dimension_elements(self, dimension).get('elements')
 
-    def find_concept(self, search_string=None):
+    def find_concept(self, search_string: str=None):
         """
 
         :param search_string: Optionally pre-fill the search field
@@ -587,7 +587,8 @@ class ObservationConstraint(Queryable):
             raise AttributeError('{}.api not set. Cannot be interactive.'.format(self.__class__))
 
         cp = ConceptPicker(target=self.apply_tree_node_constraints, api=self.api)
-        cp.search_bar.value = search_string
+        if search_string is not None:
+            cp.search_bar.value = str(search_string)
         return cp.get()
 
     def interact(self):

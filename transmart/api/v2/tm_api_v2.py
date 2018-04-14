@@ -50,6 +50,12 @@ class TransmartV2(TransmartAPIBase):
         self.relation_types = None
         self.interactive = interactive
 
+        self._observation_call_factory('aggregates_per_concept')
+        self._observation_call_factory('counts')
+        self._observation_call_factory('counts_per_concept')
+        self._observation_call_factory('counts_per_study')
+        self._observation_call_factory('counts_per_study_and_concept')
+
         if interactive:
             self.build_cache()
 
@@ -105,6 +111,18 @@ class TransmartV2(TransmartAPIBase):
             return observations.dataframe
 
         return observations
+
+    def _observation_call_factory(self, handle, doc=None):
+
+        def func(constraint=None, *args, **kwargs):
+            q = Query(handle='/v2/observations/' + handle,
+                      method='POST',
+                      json={'constraint': constraint.json()}
+                      )
+            return self.query(q)
+
+        func.__doc__ = doc
+        self.get_observations.__dict__[handle] = default_constraint(func)
 
     @default_constraint
     def get_patients(self, constraint=None, **kwargs):
@@ -217,15 +235,7 @@ class TransmartV2(TransmartAPIBase):
         return ObservationSetHD(self.query(q))
 
     @default_constraint
-    def aggregates_per_concept(self, constraint=None, **kwargs):
-        q = Query(handle='/v2/observations/aggregates_per_concept',
-                  method='POST',
-                  json={'constraint': constraint.json()}
-                  )
-        return self.query(q)
-
-    @default_constraint
-    def dimension_elements(self, constraint=None, dimension=None, **kwargs):
+    def dimension_elements(self, dimension, constraint=None, **kwargs):
         q = Query(handle='/v2/dimensions/{}/elements'.format(dimension),
                   method='GET',
                   params=dict(
@@ -236,6 +246,10 @@ class TransmartV2(TransmartAPIBase):
 
     def get_relation_types(self):
         q = Query(handle='/v2/pedigree/relation_types')
+        return self.query(q)
+
+    def get_supported_fields(self):
+        q = Query(handle='/v2/supported_fields')
         return self.query(q)
 
     def new_constraint(self, *args, **kwargs):
