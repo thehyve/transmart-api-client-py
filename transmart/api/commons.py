@@ -1,4 +1,9 @@
+from datetime import datetime
+
+import arrow
 from hashlib import sha1
+
+INPUT_DATE_FORMATS = ['D-M-YYYY', 'YYYY-M-D']
 
 
 def get_dict_identity(dictionary, fields=None):
@@ -30,3 +35,9 @@ def get_dict_identity(dictionary, fields=None):
 
     recurse(dictionary)
     return identity.hexdigest()
+
+
+def date_to_timestamp(date):
+    dt = arrow.get(date, INPUT_DATE_FORMATS).datetime
+    d = datetime(dt.year, dt.month, dt.day)
+    return d.timestamp() * 1000

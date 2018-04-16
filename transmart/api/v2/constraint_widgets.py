@@ -1,4 +1,5 @@
 import math
+from datetime import datetime
 
 import arrow
 import ipywidgets as widgets
@@ -187,31 +188,51 @@ class ConstraintWidget:
         self.constraint = observation_constraint
         self.numeric_range = self._build_numeric_range()
         self.categorical_select = self._build_list_selector('value_list', 'Values')
+        self.categorical_select.layout.width = '450px'
         self.trial_visit_select = self._build_list_selector('trial_visit', 'Visits')
 
-        def update_date_attr(attr):
+        def update_date_attr(attr, *args):
             def observer(change):
                 try:
-                    date = change.get('new').isoformat()
+                    date = change.get('new')
+                    for func in args:
+                        date = func(date)
+
                 except AttributeError:
                     date = None
+
                 setattr(self.constraint, attr, date)
             return observer, 'value'
 
+        self.date_value_min = widgets.DatePicker(
+            description='After:')
+
+        self.date_value_max = widgets.DatePicker(
+            description='before:',
+            style={'description_width': '50px'})
+
+        self.date_value_min.observe(*update_date_attr('min_date_value', lambda x: str(x)))
+        self.date_value_max.observe(*update_date_attr('max_date_value', lambda x: str(x)))
+
+        self.date_value_box = HBox([self.date_value_min, self.date_value_max])
+
         self.start_date_since = widgets.DatePicker(
+            disabled=True,
             description='Start date:')
 
         self.start_date_before = widgets.DatePicker(
             description='through',
+            disabled=True,
             style={'description_width': '50px'})
 
-        self.start_date_since.observe(*update_date_attr('min_start_date'))
-        self.start_date_before.observe(*update_date_attr('max_start_date'))
+        self.start_date_since.observe(*update_date_attr('min_start_date', lambda x: x.isoformat()))
+        self.start_date_before.observe(*update_date_attr('max_start_date', lambda x: x.isoformat()))
         self.start_date_box = HBox([self.start_date_since, self.start_date_before])
 
         self.detail_fields = VBox([
             self.numeric_range,
             self.categorical_select,
+            self.date_value_box,
             self.trial_visit_select,
             self.start_date_box
         ])
@@ -272,16 +293,22 @@ class ConstraintWidget:
     def set_initial(self):
         widget_off(self.numeric_range)
         widget_off(self.categorical_select)
+        widget_off(self.date_value_min)
+        widget_off(self.date_value_max)
         self.update_trial_visits(DEFAULT_VISIT)
-        # widget_off(self.start_date_box)
 
     def set_numerical(self):
-        widget_off(self.categorical_select)
+        self.set_initial()
         widget_on(self.numeric_range)
 
     def set_categorical(self):
+        self.set_initial()
         widget_on(self.categorical_select)
-        widget_off(self.numeric_range)
+
+    def set_date(self):
+        self.set_initial()
+        widget_on(self.date_value_min)
+        widget_on(self.date_value_max)
 
     def update_from_aggregates(self, aggregates):
         if aggregates.get(AGG_CAT):
@@ -295,14 +322,25 @@ class ConstraintWidget:
 
         elif aggregates.get(AGG_NUM):
             agg = aggregates.get(AGG_NUM)
-            w = self.numeric_range
             min_, max_ = (agg.get('min'), agg.get('max'))
 
-            w.max = float('Inf')
-            w.min, w.max = (min_, max_)
-            w.value = (min_, max_)
-            self.set_numerical()
+            # We have to guess whether we are dealing with dates or normal values
+            # as the mechanism is entirely the same for both. Although we want
+            # to show a different widget.
+            is_date = max_ >= 1e12  # latest date after 2001-09-09
 
+            if not is_date:
+                w = self.numeric_range
+
+                w.max = float('Inf')
+                w.min, w.max = (min_, max_)
+                w.value = (min_, max_)
+                self.set_numerical()
+
+            else:
+                self.date_value_min.value = datetime.utcfromtimestamp(min_ // 1000).date()
+                self.date_value_max.value = datetime.utcfromtimestamp(max_ // 1000).date()
+                self.set_date()
         else:
             self.set_initial()
 

@@ -6,8 +6,9 @@
 import json
 
 import arrow
-from functools import wraps
 
+from functools import wraps
+from ..commons import date_to_timestamp, INPUT_DATE_FORMATS
 from .constraint_widgets import ConceptPicker, ConstraintWidget
 
 END_OF_DAY_FMT = 'YYYY-MM-DDT23:59:59ZZ'
@@ -66,25 +67,31 @@ def bind_widget_tuple(target, pos):
     return bind_decorator
 
 
-def bind_widget_list(target):
-    """
-    :param target: widget to bind to.
-    """
-    def bind_decorator(func):
-        @wraps(func)
-        def wrapper(self, value):
-            try:
-                w = getattr(self._details_widget, target)
-                with w.hold_sync():
-                    w.value = () if value is None else tuple(value)
+def bind_widget_factory(callable_):
+    def bind_widget_type(target, *args):
+        """
+        :param target: widget to bind to.
+        """
+        def bind_decorator(func):
+            @wraps(func)
+            def wrapper(self, value):
+                try:
+                    w = getattr(self._details_widget, target)
+                    with w.hold_sync():
+                        w.value = callable_(value, *args)
 
-            except AttributeError:
-                pass
+                except AttributeError:
+                    pass
 
-            finally:
-                return func(self, value)
-        return wrapper
-    return bind_decorator
+                finally:
+                    return func(self, value)
+            return wrapper
+        return bind_decorator
+    return bind_widget_type
+
+
+bind_widget_list = bind_widget_factory(lambda x: () if x is None else tuple(x))
+bind_widget_date = bind_widget_factory(lambda x: arrow.get(x, INPUT_DATE_FORMATS).date())
 
 
 class Query:
@@ -196,6 +203,24 @@ class MaxValueConstraint(ValueConstraint):
     operator = '<='
 
 
+class MinDateValueConstraint(MinValueConstraint):
+    modifier = 0
+
+    def json(self):
+        tmp_ = self.value
+        try:
+            self.value = date_to_timestamp(self.value)
+            self.value += self.modifier
+            return super().json()
+
+        finally:
+            self.value = tmp_
+
+
+class MaxDateValueConstraint(MaxValueConstraint, MinDateValueConstraint):
+    modifier = 24 * 60 * 60 * 1000 - 1  # add 23:59:59:999 in ms
+
+
 class ValueListConstraint(ValueConstraint):
     value_type_ = 'STRING'
     operator = '='
@@ -284,6 +309,8 @@ class ObservationConstraint(Queryable):
               'trial_visit': TrialVisitConstraint,
               'min_value': MinValueConstraint,
               'max_value': MaxValueConstraint,
+              'min_date_value': MinDateValueConstraint,
+              'max_date_value': MaxDateValueConstraint,
               'value_list': ValueListConstraint,
               'min_start_date': StartTimeAfterConstraint,
               'max_start_date': StartTimeBeforeConstraint
@@ -298,6 +325,8 @@ class ObservationConstraint(Queryable):
                  value_list=None,
                  min_start_date=None,
                  max_start_date=None,
+                 min_date_value=None,
+                 max_date_value=None,
                  subselection=None,
                  api=None):
         """
@@ -311,6 +340,8 @@ class ObservationConstraint(Queryable):
         :param trial_visit:
         :param min_value:
         :param max_value:
+        :param min_date_value:
+        :param max_date_value:
         :param min_start_date:
         :param max_start_date:
         :param subselection:
@@ -324,6 +355,8 @@ class ObservationConstraint(Queryable):
         self.__max_value = None
         self.__min_start_date = None
         self.__max_start_date = None
+        self.__min_date_value = None
+        self.__max_date_value = None
         self.__subselection = None
         self._dimension_elements = None
         self._aggregates = None
@@ -342,6 +375,8 @@ class ObservationConstraint(Queryable):
         self.max_value = max_value
         self.min_start_date = min_start_date
         self.max_start_date = max_start_date
+        self.min_date_value = min_date_value
+        self.max_date_value = max_date_value
         self.subselection = subselection
 
     def __len__(self):
@@ -482,6 +517,32 @@ class ObservationConstraint(Queryable):
         self.__max_value = value
 
     @property
+    def min_date_value(self):
+        """
+        Minimum value for date concepts, formatted as 'D-M-YYYY', or 'YYYY-M-D'.
+        """
+        return self.__min_date_value
+
+    @min_date_value.setter
+    @input_check((str, ))
+    @bind_widget_date('date_value_min')
+    def min_date_value(self, value):
+        self.__min_date_value = value
+
+    @property
+    def max_date_value(self):
+        """
+        Maximum value for date concepts, formatted as 'D-M-YYYY', or 'YYYY-M-D'.
+        """
+        return self.__max_date_value
+
+    @max_date_value.setter
+    @input_check((str, ))
+    @bind_widget_date('date_value_max')
+    def max_date_value(self, value):
+        self.__max_date_value = value
+
+    @property
     def concept(self):
         return self.__concept
 
@@ -495,6 +556,7 @@ class ObservationConstraint(Queryable):
 
     @max_start_date.setter
     @input_check((str, ))
+    @bind_widget_date('max_start_before')
     def max_start_date(self, value):
         self.__max_start_date = value
 
@@ -504,6 +566,7 @@ class ObservationConstraint(Queryable):
 
     @min_start_date.setter
     @input_check((str, ))
+    @bind_widget_date('max_start_since')
     def min_start_date(self, value):
         self.__min_start_date = value
 
