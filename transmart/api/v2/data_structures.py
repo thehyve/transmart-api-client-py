@@ -172,6 +172,10 @@ class PatientSets:
 class RelationTypes:
 
     def __init__(self, json):
+        if json.get('httpStatus'):
+            msg = 'Response code: {}. {!r}.'.format(json.get('httpStatus'), json.get('message'))
+            print(msg)
+            return
         for entry in json.get('relationTypes'):
             label = entry.get('label')
             description = entry.get('description') or label
