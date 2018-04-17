@@ -1,9 +1,19 @@
 import time
 
 import os
-from whoosh.fields import Schema, TEXT, NGRAM
+import shutil
+
+from whoosh.fields import Schema, TEXT, NGRAM, NGRAMWORDS
 from whoosh.index import create_in, exists_in, open_dir
 from whoosh.qparser import MultifieldParser, FuzzyTermPlugin
+
+user = os.path.expanduser('~')
+cache_dir = os.path.join(user, '.transmart-api-cache', 'schemas')
+
+
+def clear_cache():
+    print('Removing cached indexes at: {!r}'.format(cache_dir))
+    shutil.rmtree(cache_dir)
 
 
 class ConceptSearcher:
@@ -22,11 +32,10 @@ class ConceptSearcher:
             return [r['fullname'] for r in results]
 
     def get_schema(self):
-        user = os.path.expanduser('~')
-        schema_dir = os.path.join(user, '.transmart-api-cache', 'schemas', self.id_)
+        schema_dir = os.path.join(cache_dir, self.id_)
         os.makedirs(schema_dir, exist_ok=True)
 
-        if exists_in(schema_dir):
+        if exists_in(schema_dir) and open_dir(schema_dir).doc_count() != 0:
             self.ix = open_dir(schema_dir)
             print('Existing index cache found. Loaded {} tree nodes. Hooray!'.
                   format(self.ix.doc_count()))
@@ -48,10 +57,10 @@ class ConceptSearcher:
             node=TEXT(),
             fullname=TEXT(stored=True),
             path=TEXT(),
-            type=TEXT(),
+            type=NGRAM(minsize=4),
             study=NGRAM(field_boost=10.0),
-            name=NGRAM(minsize=3, field_boost=3.0),
-            metadata=TEXT(),
+            name=NGRAMWORDS(minsize=3, field_boost=3.0),
+            metadata=NGRAMWORDS(minsize=3),
         )
         schema = Schema(**fields)
         self.ix = create_in(schema_dir, schema)
