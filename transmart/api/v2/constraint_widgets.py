@@ -91,7 +91,7 @@ class ConceptPicker:
             value=self.result_count_template.format(self.no_filter_len),
             layout={'width': '175px'}
         )
-        self.result_text = widgets.HTML()
+        self.result_text = widgets.HTML(layout={'width': '49%'})
 
         self.search_bar = self._build_search_bar()
         self.concept_list = self._build_concept_list()
@@ -100,10 +100,13 @@ class ConceptPicker:
         out = widgets.Output()
 
         def confirm_tree_node(btn):
+            from .query_constraints import ObservationConstraint
+
             with out:
                 try:
                     node = self.api.tree_dict.get(self.concept_list.value)
-                    self.target(node.get('constraint'))
+                    c = ObservationConstraint.from_tree_node(node.get('constraint'))
+                    self.target(c)
                 except ValueError:
                     pass
 
@@ -112,8 +115,8 @@ class ConceptPicker:
 
         self.box_and_picker = VBox([
             HBox([self.search_bar, self.result_count, self._confirm]),
-            self.concept_list,
-            self.result_text])
+            HBox([self.concept_list, self.result_text])
+        ])
 
         self.concept_picker = VBox([create_toggle(self.box_and_picker, out), self.box_and_picker])
 
@@ -158,7 +161,7 @@ class ConceptPicker:
             rows=10,
             disabled=False,
             continous_update=False,
-            layout={'width': '95%'}
+            layout={'width': '50%'}
         )
 
         concept_list.observe(concept_list_watcher, 'value')

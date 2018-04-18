@@ -579,6 +579,12 @@ class ObservationConstraint(Queryable):
     def subselection(self, value):
         self.__subselection = value
 
+    @classmethod
+    def from_tree_node(cls, constraints):
+        c = cls()
+        c.apply_tree_node_constraints(constraints)
+        return c
+
     def apply_tree_node_constraints(self, constraints):
         """
         Reset current argument and apply those from a tree node constraints dict.
