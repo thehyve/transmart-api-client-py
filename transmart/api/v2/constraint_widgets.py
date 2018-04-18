@@ -100,13 +100,10 @@ class ConceptPicker:
         out = widgets.Output()
 
         def confirm_tree_node(btn):
-            from .query_constraints import ObservationConstraint
-
             with out:
                 try:
                     node = self.api.tree_dict.get(self.concept_list.value)
-                    c = ObservationConstraint.from_tree_node(node.get('constraint'))
-                    self.target(c)
+                    self.target(node.get('constraint'))
                 except ValueError:
                     pass
 
