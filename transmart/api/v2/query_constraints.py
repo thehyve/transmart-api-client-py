@@ -392,7 +392,7 @@ class ObservationConstraint(Queryable):
         for arg in self.params.keys():
             if getattr(self, arg) is not None:
                 arguments.append(
-                    '{}={}'.format(arg, getattr(self, arg))
+                    '{}={}'.format(arg, repr(getattr(self, arg)))
                 )
 
         return '{}({})'.format(
