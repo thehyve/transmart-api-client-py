@@ -134,7 +134,7 @@ class StudyConstraint(Constraint):
     val_name = 'studyId'
 
 
-class PatientSetConstraint(Constraint):
+class SubjectSetConstraint(Constraint):
     type_ = 'patient_set'
     val_name = 'patientSetId'
 
@@ -313,7 +313,8 @@ class ObservationConstraint(Queryable):
               'max_date_value': MaxDateValueConstraint,
               'value_list': ValueListConstraint,
               'min_start_date': StartTimeAfterConstraint,
-              'max_start_date': StartTimeBeforeConstraint
+              'max_start_date': StartTimeBeforeConstraint,
+              'subject_set_id': SubjectSetConstraint,
               }
 
     def __init__(self,
@@ -327,6 +328,7 @@ class ObservationConstraint(Queryable):
                  max_start_date=None,
                  min_date_value=None,
                  max_date_value=None,
+                 subject_set_id=None,
                  subselection=None,
                  api=None):
         """
@@ -344,6 +346,7 @@ class ObservationConstraint(Queryable):
         :param max_date_value:
         :param min_start_date:
         :param max_start_date:
+        :param subject_set_id:
         :param subselection:
         :param api:
         """
@@ -357,6 +360,8 @@ class ObservationConstraint(Queryable):
         self.__max_start_date = None
         self.__min_date_value = None
         self.__max_date_value = None
+        self.__subject_set_id = None
+
         self.__subselection = None
         self._dimension_elements = None
         self._aggregates = None
@@ -377,6 +382,7 @@ class ObservationConstraint(Queryable):
         self.max_start_date = max_start_date
         self.min_date_value = min_date_value
         self.max_date_value = max_date_value
+        self.subject_set_id = subject_set_id
         self.subselection = subselection
 
     def __len__(self):
@@ -569,6 +575,15 @@ class ObservationConstraint(Queryable):
     @bind_widget_date('max_start_since')
     def min_start_date(self, value):
         self.__min_start_date = value
+
+    @property
+    def subject_set_id(self):
+        return self.__subject_set_id
+
+    @subject_set_id.setter
+    @input_check((int, ))
+    def subject_set_id(self, value):
+        self.__subject_set_id = value
 
     @property
     def subselection(self):

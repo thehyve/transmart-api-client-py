@@ -145,7 +145,7 @@ class TransmartV2(TransmartAPIBase):
         return PatientSets(self.query(q))
 
     @default_constraint
-    def create_patient_set(self, name, constraint=None, **kwargs):
+    def create_patient_set(self, name: str, constraint=None, **kwargs):
         """
         Create a patient set that can be reused at a later stage.
 
