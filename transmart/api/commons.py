@@ -41,3 +41,16 @@ def date_to_timestamp(date):
     dt = arrow.get(date, INPUT_DATE_FORMATS).datetime
     d = datetime(dt.year, dt.month, dt.day)
     return d.timestamp() * 1000
+
+
+def filter_tree(tree_dict, counts_per_study_and_concept):
+    concepts = set()
+    for k, v in counts_per_study_and_concept['countsPerStudy'].items():
+        concepts.update(v)
+
+    studies = counts_per_study_and_concept['countsPerStudy'].keys()
+
+    return {k for k, v in tree_dict.items()
+            if v.get('conceptCode') in concepts
+            and v.get('studyId') in (*studies, None)
+            }

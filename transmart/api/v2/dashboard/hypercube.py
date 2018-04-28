@@ -32,6 +32,7 @@ class Hypercube:
         self.dims = []
         self._cols = list(dimensions.values()) + value_columns
         self.data = pd.DataFrame()
+        self.total_subjects = None
         self._subject_bool_mask = None
         self.__subjects_mask = None
         self.study_concept_pairs = set()
@@ -56,6 +57,7 @@ class Hypercube:
 
         sub_set = df.loc[:, self._cols]
         self.data = self.data.append(sub_set, ignore_index=True)
+        self.total_subjects = len(self.data[patient_id].unique())
 
     def query(self, no_filter=False, **kwargs):
         expressions = []

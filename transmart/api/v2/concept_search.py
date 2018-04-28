@@ -25,10 +25,10 @@ class ConceptSearcher:
         self._tree_dict = tree_dict
         self.get_schema()
 
-    def search(self, query_string, limit=50):
+    def search(self, query_string, limit=50, allowed_nodes: set=None):
         with self.ix.searcher() as searcher:
             query = self.parser.parse(query_string)
-            results = searcher.search(query, limit=limit,)
+            results = searcher.search(query, limit=limit, filter=allowed_nodes)
             return [r['fullname'] for r in results]
 
     def get_schema(self):

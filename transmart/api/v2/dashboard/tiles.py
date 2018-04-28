@@ -9,11 +9,9 @@ import logging
 import bqplot as plt
 import ipywidgets as widgets
 
-from .constraint_widgets import ConceptPicker
-from .query_constraints import ObservationConstraint, Queryable
-from .hypercube import Hypercube
-
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 debug_view = widgets.Output(layout={'border': '1px solid black'})
 
 _NUMERIC_VALUE = 'numericValue'
@@ -71,7 +69,7 @@ class Tile:
     def set_values(self, values):
         raise NotImplementedError
 
-    def _calc_selected_subjects(self):
+    def _calc_selected_subjects(self, *args):
         raise NotImplementedError
 
     def refresh(self):
@@ -88,8 +86,9 @@ class Tile:
 
     def get_buttons(self):
         btn_layout = {
-            'width': '35px',
-            'height': '35px'
+            'width': '25px',
+            'height': '25px',
+            'padding': '0px'
         }
 
         btn1 = widgets.Button(icon='fa-check', layout=btn_layout)
@@ -99,8 +98,6 @@ class Tile:
         buttons = widgets.VBox([
             btn1, btn2, btn3
         ], layout={'margin': '60px 25px 0px -60px'})
-
-        btn1.layout.width = btn1.layout.height = '35px'
 
         btn1.on_click(self._calc_selected_subjects)
 
@@ -129,12 +126,11 @@ class HistogramTile(Tile):
         selector = plt.interacts.BrushIntervalSelector(
             scale=scale_x, marks=[hist], color='SteelBlue')
 
-        print('Returning figure.')
+        logger.info('Returning figure.JOCHEMJOCHEM')
         return plt.Figure(axes=[ax_x, ax_y], marks=[hist], interaction=selector)
 
     @debug_view.capture(clear_output=False)
     def set_values(self, values):
-        print('Updating values.')
         m = self.fig.marks[0]
         with self.fig.hold_sync():
             m.sample = values
@@ -147,29 +143,33 @@ class HistogramTile(Tile):
         if len(self.fig.interaction.selected):
             min_, max_ = self.fig.interaction.selected
             selected = values.index[values.between(min_, max_)]
-            print(values, min_, max_)
             self.selected_subjects = set(self.dash.hypercube.data.loc[selected, 'patient.id'])
 
         else:
             self.selected_subjects = None
 
-        print(self.selected_subjects)
         self.dash.hypercube.subject_mask = self.selected_subjects
         self.dash.update(exclude=self)
 
-    def refresh(self):
-        """ Seems to resolve problems  with the brush selector. """
+    @debug_view.capture()
+    def refresh(self, *args):
+        """ Seems to resolve problems with the brush selector. """
         values = self.fig.marks[0].sample
+
         with self.fig.hold_sync():
-            self.set_values([])
+            self.set_values([])  # TODO better way to make brush selector reliable.
             self.set_values(values)
+
+        self.fig.interaction.reset()
+        self.fig.interaction.selected = []
+        print('Selected: ', self.fig.interaction.selected)
 
 
 class PieTile(Tile):
     value_type = _STRING_VALUE
 
     @debug_view.capture(clear_output=False)
-    def create_fig(self):
+    def create_fig(self, *args):
         print('Creating figure.')
 
         tooltip_widget = plt.Tooltip(fields=['size', 'label'])
@@ -184,8 +184,6 @@ class PieTile(Tile):
 
     @debug_view.capture(clear_output=False)
     def set_values(self, values):
-        print('Updating values.')
-
         pie = self.fig.marks[0]
         counts = values.value_counts()
 
@@ -194,87 +192,25 @@ class PieTile(Tile):
             pie.sizes = counts
             pie.labels = list(counts.index)
 
-    def _calc_selected_subjects(self):
-        pass
-
-    def refresh(self):
-        pass
-
-
-class Dashboard:
-
-    def __init__(self, api, patients: Queryable=None):
-        self.api = api
-        self.tiles = list()
-        self.hypercube = Hypercube()
-
-        if isinstance(patients, Queryable):
-            self.subject_set_ids = api.create_patient_set(repr(patients), patients).get('id')
-        else:
-            self.subject_set_ids = None
-
-        self.out = widgets.Box()
-        self.out.layout.flex_flow = 'row wrap'
-
-        self.cp = ConceptPicker(self.plotter, api)
-
-    def get(self):
-        return widgets.VBox([self.out, self.cp.get()])
-
     @debug_view.capture()
-    def plotter(self, constraints):
-        c = ObservationConstraint.from_tree_node(constraints)
+    def _calc_selected_subjects(self, *args):
+        subset = self.dash.hypercube.query(concept=self.concept, study=self.study, no_filter=True)
+        values = subset[self.value_type]
 
-        if self.subject_set_ids is not None:
-            c.subject_set_id = self.subject_set_ids
-
-        obs = self.api.get_observations(c)
-        self.hypercube.add_variable(obs.dataframe)
-
-        name = obs.dataframe['concept.name'][0]
-
-        if _NUMERIC_VALUE in obs.dataframe.columns:
-            tile = HistogramTile(self, name, concept=c.concept, study=c.study)
-            tile.set_values(obs.dataframe[_NUMERIC_VALUE])
-
-        elif _STRING_VALUE in obs.dataframe.columns:
-            tile = PieTile(self, name, concept=c.concept, study=c.study)
-            tile.set_values(obs.dataframe[_STRING_VALUE])
+        pie = self.fig.marks[0]
+        if pie.selected is not None:
+            labels = {pie.labels[i] for i in pie.selected}
+            print(labels)
+            selected = values.index[values.isin(labels)]
+            print(selected)
+            self.selected_subjects = set(self.dash.hypercube.data.loc[selected, 'patient.id'])
 
         else:
-            return
+            self.selected_subjects = None
 
-        self.register(tile)
-
-    def register(self, tile):
-        self.tiles.append(tile)
-        with self.out.hold_sync():
-            self.out.children = list(self.out.children) + [tile.get_fig()]
-
-        self.refresh()
-
-    def remove(self, tile):
-        tmp = list(self.out.children)
-        tmp.remove(tile)
-        with self.out.hold_sync():
-            self.out.children = tmp
-
-        self.refresh()
-
-    def update(self, exclude=None):
-        for tile in self.tiles:
-            if tile is exclude:
-                continue
-
-            tile.get_updates()
+        self.dash.hypercube.subject_mask = self.selected_subjects
+        self.dash.update(exclude=self)
 
     def refresh(self):
-        with self.out.hold_sync():
-            for tile in self.tiles:
-                tile.fig.animation_duration = 0
-                tile.refresh()
-                tile.fig.animation_duration = ANIMATION_TIME
+        self.fig.marks[0].selected = None
 
-    @property
-    def debugger(self):
-        return debug_view
