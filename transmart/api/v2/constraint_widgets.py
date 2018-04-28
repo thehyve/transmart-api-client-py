@@ -79,12 +79,15 @@ class ConceptPicker:
     </div>
     """
 
-    def __init__(self, target, api):
+    def __init__(self, target, api, allowed_nodes: set=None):
 
         self.target = target
         self.api = api
+        self.allowed_nodes = allowed_nodes
 
-        self.list_of_default_options = sorted(self.api.tree_dict.keys())
+        nodes = allowed_nodes or self.api.tree_dict.keys()
+
+        self.list_of_default_options = sorted(nodes)
         self.no_filter_len = len(self.list_of_default_options)
 
         self.result_count = widgets.HTML(
@@ -121,7 +124,9 @@ class ConceptPicker:
         def search_watcher(change):
             x = change.get('new')
             if len(x) > 2:
-                self.concept_list.options = self.api.search_tree_node(x, limit=MAX_OPTIONS)
+                self.concept_list.options = self.api.search_tree_node(x,
+                                                                      limit=MAX_OPTIONS,
+                                                                      allowed_nodes=self.allowed_nodes)
                 count = len(self.concept_list.options)
 
                 if count == MAX_OPTIONS:
