@@ -78,5 +78,5 @@ class Hypercube:
         if not no_filter and self.subject_mask is not None:
             bools &= self._subject_bool_mask
 
-        return self.data.loc[bools, value_columns]
+        return self.data.loc[bools, [patient_id, *value_columns]]
 
