@@ -8,11 +8,11 @@ import logging
 
 import ipywidgets as widgets
 
-from ...commons import filter_tree
+from .hypercube import Hypercube
+from .tiles import HistogramTile, PieTile, CombinedPlot, ScatterPlot
 from ..constraint_widgets import ConceptPicker
 from ..query_constraints import ObservationConstraint, Queryable
-from .hypercube import Hypercube
-from .tiles import HistogramTile, PieTile
+from ...commons import filter_tree
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -31,6 +31,7 @@ class Dashboard:
         self.api = api
         self.tiles = list()
         self.hypercube = Hypercube()
+        self.__linked_tile = None
 
         if isinstance(patients, Queryable):
             self.subject_set_id = api.create_patient_set(repr(patients), patients).get('id')
@@ -46,6 +47,9 @@ class Dashboard:
         self.out = widgets.Box()
         self.out.layout.flex_flow = 'row wrap'
 
+        self.combination_out = widgets.Box()
+        self.combination_out.layout.flex_flow = 'row wrap'
+
         self.cp = ConceptPicker(self.plotter, api, self.nodes)
         self.counter = widgets.IntProgress(
             value=10, min=0, max=10, step=1,
@@ -53,7 +57,7 @@ class Dashboard:
         )
 
     def get(self):
-        return widgets.VBox([self.out, self.counter, self.cp.get()])
+        return widgets.VBox([self.out, self.counter, self.combination_out, self.cp.get()])
 
     @debug_view.capture()
     def plotter(self, constraints):
@@ -80,10 +84,56 @@ class Dashboard:
 
         self.register(tile)
 
+    @debug_view.capture()
+    def link_plotter(self, t1, t2):
+
+        if isinstance(t1, HistogramTile) and isinstance(t2, HistogramTile):
+            tile = ScatterPlot(t1, t2, self)
+
+        else:
+            return
+
+        self.register(tile)
+
+    @property
+    def linked_tile(self):
+        return self.__linked_tile
+
+    @linked_tile.setter
+    @debug_view.capture()
+    def linked_tile(self, tile):
+        print(tile)
+        if isinstance(tile, (PieTile, HistogramTile)):
+            for t in self.tiles:
+                try:
+                    t.link_btn.button_style = ''
+                except AttributeError:
+                    pass
+
+            if self.linked_tile is not None:
+                self.link_plotter(self.linked_tile, tile)
+                self.__linked_tile = None
+
+            else:
+                self.__linked_tile = tile
+                tile.link_btn.button_style = 'info'
+
+        elif tile is None:
+            self.__linked_tile = None
+
+        else:
+            raise ValueError('Expected Tile object.')
+
     def register(self, tile):
         self.tiles.append(tile)
-        with self.out.hold_sync():
-            self.out.children = list(self.out.children) + [tile.get_fig()]
+
+        if isinstance(tile, CombinedPlot):
+            box = self.combination_out
+        else:
+            box = self.out
+
+        with box.hold_sync():
+            box.children = list(box.children) + [tile.get_fig()]
 
         self.refresh()
 

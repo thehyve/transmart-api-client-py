@@ -8,6 +8,8 @@ import logging
 
 import bqplot as plt
 import ipywidgets as widgets
+import pandas as pd
+from IPython.display import display
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -40,11 +42,12 @@ class Tile:
     def _build_tile(self):
         self.fig = self.create_fig()
         logger.info('Created figure.')
-        buttons, btn1, btn2, destroy_btn = self.get_buttons()
+        buttons, btn1, self.link_btn, destroy_btn = self.get_buttons()
         self.comb = widgets.HBox(
             [self.fig, buttons],
             layout={'margin': '0px -20px 0px -18px'}
         )
+        self.link_btn.on_click(self.linker())
         destroy_btn.on_click(self.destroyer(self.comb))
 
         self.fig.layout.height = '350px'
@@ -62,6 +65,11 @@ class Tile:
                 self.dash.tiles.remove(self)
                 self.dash.remove(fig_box)
         return remove_fig
+
+    def linker(self):
+        def callback(btn):
+            self.dash.linked_tile = self
+        return callback
 
     def create_fig(self):
         raise NotImplementedError
@@ -97,7 +105,7 @@ class Tile:
 
         buttons = widgets.VBox([
             btn1, btn2, btn3
-        ], layout={'margin': '60px 25px 0px -60px'})
+        ], layout={'margin': '60px 30px 0px -60px'})
 
         btn1.on_click(self._calc_selected_subjects)
 
@@ -126,7 +134,7 @@ class HistogramTile(Tile):
         selector = plt.interacts.BrushIntervalSelector(
             scale=scale_x, marks=[hist], color='SteelBlue')
 
-        logger.info('Returning figure.JOCHEMJOCHEM')
+        logger.info('Returning figure.')
         return plt.Figure(axes=[ax_x, ax_y], marks=[hist], interaction=selector)
 
     @debug_view.capture(clear_output=False)
@@ -214,3 +222,67 @@ class PieTile(Tile):
     def refresh(self):
         self.fig.marks[0].selected = None
 
+
+class CombinedPlot:
+
+    def __init__(self, t1, t2, dash):
+        self.t1 = t1
+        self.t2 = t2
+        self.dash = dash
+        self.df = None
+        self.mark = None
+        self.fig = None
+
+        self.create_fig()
+        self.get_updates()
+
+    def create_fig(self):
+        raise NotImplementedError
+
+    def get_updates(self):
+        raise NotImplementedError
+
+    def get_fig(self):
+        raise NotImplementedError
+
+    def refresh(self):
+        pass
+
+
+class ScatterPlot(CombinedPlot):
+
+    @staticmethod
+    def get_values(tile):
+        df = tile.dash.hypercube.query(study=tile.study, concept=tile.concept)
+        non_empty = pd.notnull(df.numericValue)
+        df = df.loc[non_empty, ['patient.id', 'numericValue']]
+        return df
+
+    def get_updates(self):
+        mask = self.dash.hypercube.subject_mask
+
+        if mask is not None:
+            filter_ = self.df['patient.id'].isin(mask)
+        else:
+            filter_ = self.df.index
+
+        with self.fig.hold_sync():
+            self.mark.x = self.df.loc[filter_, 'numericValue_x']
+            self.mark.y = self.df.loc[filter_, 'numericValue_y']
+
+    def create_fig(self):
+        t1_values = self.get_values(self.t1)
+        t2_values = self.get_values(self.t2)
+        self.df = t1_values.merge(t2_values, how='inner', on='patient.id')
+
+        sc_x = plt.LinearScale()
+        sc_y = plt.LinearScale()
+
+        self.mark = plt.Scatter(scales={'x': sc_x, 'y': sc_y})
+
+        ax_x = plt.Axis(scale=sc_x)
+        ax_y = plt.Axis(scale=sc_y, orientation='vertical')
+        self.fig = plt.Figure(marks=[self.mark], axes=[ax_x, ax_y])
+
+    def get_fig(self):
+        return self.fig
