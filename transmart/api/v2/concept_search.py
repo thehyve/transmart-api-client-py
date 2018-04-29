@@ -28,6 +28,14 @@ class ConceptSearcher:
     def search(self, query_string, limit=50, allowed_nodes: set=None):
         with self.ix.searcher() as searcher:
             query = self.parser.parse(query_string)
+
+            if allowed_nodes is not None:
+                allowed_nodes = {
+                    doc_num for doc, doc_num
+                    in zip(searcher.documents(), searcher.document_numbers())
+                    if doc.get('fullname') in allowed_nodes
+                }
+
             results = searcher.search(query, limit=limit, filter=allowed_nodes)
             return [r['fullname'] for r in results]
 
