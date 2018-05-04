@@ -9,7 +9,11 @@ import logging
 import ipywidgets as widgets
 
 from .hypercube import Hypercube
-from .tiles import HistogramTile, PieTile, CombinedPlot, ScatterPlot
+from .tiles import (
+    HistogramTile, PieTile, CombinedPlot, ScatterPlot, ANIMATION_TIME,
+    NUMERIC_VALUE, STRING_VALUE
+)
+
 from ..constraint_widgets import ConceptPicker
 from ..query_constraints import ObservationConstraint, Queryable
 from ...commons import filter_tree
@@ -18,11 +22,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 debug_view = widgets.Output(layout={'border': '1px solid black'})
-
-_NUMERIC_VALUE = 'numericValue'
-_STRING_VALUE = 'stringValue'
-
-ANIMATION_TIME = 400
 
 
 class Dashboard:
@@ -71,13 +70,13 @@ class Dashboard:
 
         name = obs.dataframe['concept.name'][0]
 
-        if _NUMERIC_VALUE in obs.dataframe.columns:
+        if NUMERIC_VALUE in obs.dataframe.columns:
             tile = HistogramTile(self, name, concept=c.concept, study=c.study)
-            tile.set_values(obs.dataframe[_NUMERIC_VALUE])
+            tile.set_values(obs.dataframe[NUMERIC_VALUE])
 
-        elif _STRING_VALUE in obs.dataframe.columns:
+        elif STRING_VALUE in obs.dataframe.columns:
             tile = PieTile(self, name, concept=c.concept, study=c.study)
-            tile.set_values(obs.dataframe[_STRING_VALUE])
+            tile.set_values(obs.dataframe[STRING_VALUE])
 
         else:
             return
