@@ -4,3 +4,5 @@ pandas
 whoosh
 arrow
 ipywidgets
+IPython
+bqplot

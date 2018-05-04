@@ -9,17 +9,16 @@ import logging
 import bqplot as plt
 import ipywidgets as widgets
 import pandas as pd
-from IPython.display import display
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 debug_view = widgets.Output(layout={'border': '1px solid black'})
 
-_NUMERIC_VALUE = 'numericValue'
-_STRING_VALUE = 'stringValue'
+NUMERIC_VALUE = 'numericValue'
+STRING_VALUE = 'stringValue'
 
-ANIMATION_TIME = 400
+ANIMATION_TIME = 1000
 
 
 class Tile:
@@ -118,7 +117,7 @@ class Tile:
 
 
 class HistogramTile(Tile):
-    value_type = _NUMERIC_VALUE
+    value_type = NUMERIC_VALUE
 
     @debug_view.capture(clear_output=False)
     def create_fig(self):
@@ -174,7 +173,7 @@ class HistogramTile(Tile):
 
 
 class PieTile(Tile):
-    value_type = _STRING_VALUE
+    value_type = STRING_VALUE
 
     @debug_view.capture(clear_output=False)
     def create_fig(self, *args):
@@ -183,10 +182,13 @@ class PieTile(Tile):
         tooltip_widget = plt.Tooltip(fields=['size', 'label'])
         pie = plt.Pie(tooltip=tooltip_widget,
                       interactions={'click': 'select', 'hover': 'tooltip'})
-        pie.radius = 100
-        print('Returning figure.')
+
+        pie.radius = 110
+        pie.inner_radius = 65
+        pie.font_weight = 'bold'
         pie.selected_style = {"opacity": "1", "stroke": "white", "stroke-width": "4"}
-        pie.unselected_style = {"opacity": "0.2"}
+        pie.unselected_style = {"opacity": "0.5"}
+        print('Returning figure.')
 
         return plt.Figure(marks=[pie])
 
@@ -194,11 +196,22 @@ class PieTile(Tile):
     def set_values(self, values):
         pie = self.fig.marks[0]
         counts = values.value_counts()
+        labels = list(pie.labels)
+
+        sizes = []
+        for label in labels:
+            try:
+                sizes.append(counts.pop(label))
+            except KeyError:
+                labels.remove(label)
+
+        for index, element in counts.iteritems():
+            sizes.append(element)
+            labels.append(index)
 
         with self.fig.hold_sync():
-            pie.labels = pie.sizes = []
-            pie.sizes = counts
-            pie.labels = list(counts.index)
+            pie.labels = labels
+            pie.sizes = sizes
 
     @debug_view.capture()
     def _calc_selected_subjects(self, *args):
@@ -208,9 +221,7 @@ class PieTile(Tile):
         pie = self.fig.marks[0]
         if pie.selected is not None:
             labels = {pie.labels[i] for i in pie.selected}
-            print(labels)
             selected = values.index[values.isin(labels)]
-            print(selected)
             self.selected_subjects = set(self.dash.hypercube.data.loc[selected, 'patient.id'])
 
         else:
@@ -236,13 +247,13 @@ class CombinedPlot:
         self.create_fig()
         self.get_updates()
 
+    def get_fig(self):
+        return self.fig
+
     def create_fig(self):
         raise NotImplementedError
 
     def get_updates(self):
-        raise NotImplementedError
-
-    def get_fig(self):
         raise NotImplementedError
 
     def refresh(self):
@@ -278,11 +289,9 @@ class ScatterPlot(CombinedPlot):
         sc_x = plt.LinearScale()
         sc_y = plt.LinearScale()
 
-        self.mark = plt.Scatter(scales={'x': sc_x, 'y': sc_y})
+        self.mark = plt.Scatter(scales={'x': sc_x, 'y': sc_y}, default_size=16)
 
-        ax_x = plt.Axis(scale=sc_x)
-        ax_y = plt.Axis(scale=sc_y, orientation='vertical')
+        ax_x = plt.Axis(scale=sc_x, label=self.t1.title)
+        ax_y = plt.Axis(scale=sc_y, label=self.t2.title, orientation='vertical')
         self.fig = plt.Figure(marks=[self.mark], axes=[ax_x, ax_y])
 
-    def get_fig(self):
-        return self.fig
