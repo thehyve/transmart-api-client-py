@@ -4,19 +4,36 @@
 * version 3.
 """
 
-import requests
+import logging
+from urllib.parse import unquote_plus
 
+import requests
+from functools import wraps
 from pandas.io.json import json_normalize
 
+from .concept_search import ConceptSearcher
+from .data_structures import (ObservationSet, ObservationSetHD, TreeNodes, Patients,
+                              PatientSets, Studies, StudyList, RelationTypes)
+from .query_constraints import Query, ObservationConstraint, Queryable, BiomarkerConstraint
 from ..tm_api_base import TransmartAPIBase
-from .query import Query
-from .data_structures import ObservationSet, ObservationSetHD, TreeNodes, PatientSets, Studies, StudyList
+
+logger = logging.getLogger('tm-api')
+
+
+def default_constraint(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if kwargs.get('constraint') is None:
+            if not any([isinstance(o, Queryable) for o in args]):
+                kwargs['constraint'] = ObservationConstraint(**kwargs)
+        return func(*args, **kwargs)
+    return wrapper
 
 
 class TransmartV2(TransmartAPIBase):
     """ Connect to tranSMART using Python. """
 
-    def __init__(self, host, user=None, password=None, print_urls=False):
+    def __init__(self, host, user=None, password=None, print_urls=False, interactive=True):
         """
         Create the python transmart client by providing user credentials.
 
@@ -24,16 +41,40 @@ class TransmartV2(TransmartAPIBase):
         :param user: if not given, it asks for it.
         :param password: if not given, it asks for it.
         :param print_urls: print the url of handles being used.
+        :param interactive: automatically build caches for interactive use.
         """
         super().__init__(host, user, password, print_urls)
         self.studies = None
+        self.tree_dict = None
+        self.search_tree_node = None
+        self.relation_types = None
+        self.interactive = interactive
+
+        self._observation_call_factory('aggregates_per_concept')
+        self._observation_call_factory('counts')
+        self._observation_call_factory('counts_per_concept')
+        self._observation_call_factory('counts_per_study')
+        self._observation_call_factory('counts_per_study_and_concept')
+
+        if interactive:
+            self.build_cache()
+
+    def build_cache(self):
+        logger.debug('Caching list of studies.')
+        self.get_studies()
+
+        logger.debug('Caching full tree as tree_dict.')
+        full_tree = self.tree_nodes()
+        self.tree_dict = full_tree.tree_dict
+        self.search_tree_node = ConceptSearcher(self.tree_dict, full_tree.identity).search
+
+        logger.debug('Getting subject relationship types.')
+        self.relation_types = RelationTypes(self.get_relation_types())
 
     def query(self, q):
         """ Perform query using API client using a Query object """
 
         url = "{}{}".format(self.host, q.handle)
-        if self.print_urls:
-            print(q)
 
         headers = q.headers
         headers['Authorization'] = 'Bearer ' + self.access_token
@@ -43,24 +84,26 @@ class TransmartV2(TransmartAPIBase):
         else:
             r = requests.post(url, json=q.json, params=q.params, headers=headers)
 
+        if self.print_urls:
+            print(unquote_plus(r.url))
+
         return r.json()
 
-    def get_observations(self, study=None, patient_set=None, concept=None, operator="and", as_dataframe=False):
+    @default_constraint
+    def get_observations(self, constraint=None, as_dataframe=False, **kwargs):
         """
         Get observations, from the main table in the transmart data model.
 
-        :param study: studyID
-        :param patient_set: patient set id
+        :param constraint: Constraint object. If left None, any keyword arguments
+           are added to the constraint.
         :param as_dataframe: If True, convert json response to dataframe directly
-        :return: dataframe or ObservationSet object
+        :return: dataframe or direct json
         """
-
         q = Query(handle='/v2/observations',
-                  params={"type": "clinical"},
-                  in_study=study,
-                  in_patientset=patient_set,
-                  in_concept=concept,
-                  operator=operator)
+                  params=dict(
+                      type='clinical',
+                      constraint=str(constraint))
+                  )
 
         observations = ObservationSet(self.query(q))
 
@@ -69,39 +112,54 @@ class TransmartV2(TransmartAPIBase):
 
         return observations
 
-    def get_patients(self, study=None, patient_set=None, as_dataframe=False):
+    def _observation_call_factory(self, handle, doc=None):
+
+        def func(constraint=None, *args, **kwargs):
+            q = Query(handle='/v2/observations/' + handle,
+                      method='POST',
+                      json={'constraint': constraint.json()}
+                      )
+            return self.query(q)
+
+        func.__doc__ = doc
+        self.get_observations.__dict__[handle] = default_constraint(func)
+
+    @default_constraint
+    def get_patients(self, constraint=None, **kwargs):
         """
         Get patients.
 
-        :param study: studyID
-        :param patient_set: patient set id
-        :param as_dataframe: If True, convert json response to dataframe directly
+        :param constraint: Constraint object. If left None, any keyword arguments
+           are added to the constraint.
         :return: dataframe or direct json
         """
-        q = Query(handle='/v2/patients', in_study=study, in_patientset=patient_set)
+        q = Query(handle='/v2/patients', method='POST', json={'constraint': constraint.json()})
+        return Patients(self.query(q))
 
-        patients = self.query(q)
+    def get_patient_sets(self, patient_set_id=None):
+        q = Query(handle='/v2/patient_sets')
 
-        if as_dataframe:
-            patients = json_normalize(patients['patients'])
-        return patients
+        if patient_set_id:
+            q.handle += '/{}'.format(patient_set_id)
 
-    def create_patient_set(self, name, concept, operator=None):
+        return PatientSets(self.query(q))
+
+    @default_constraint
+    def create_patient_set(self, name: str, constraint=None, **kwargs):
         """
-        Create a patient set with one concept as filter.
+        Create a patient set that can be reused at a later stage.
 
-        :param name: Name of the patient set
-        :param constraint: Concept path or code for which the patients should have an observation
+        :param name: name of the patient set to create.
+        :param constraint: observation constraints to use in query.
         :return: direct json
         """
-        q = Query(handle='/v2/patient_sets', method="POST", params={"name":name}, in_concept=concept, operator=operator)
+        q = Query(handle='/v2/patient_sets',
+                  method="POST",
+                  params={"name": name},
+                  json=constraint.json()
+                  )
 
-        q.json = q.params.get("constraint")
-        del q.params['constraint']
-        q.headers['content-type'] = 'application/json'
-
-        result = self.query(q)
-        return result
+        return self.query(q)
 
     def get_studies(self, as_dataframe=False):
         """
@@ -115,17 +173,19 @@ class TransmartV2(TransmartAPIBase):
 
         studies = Studies(self.query(q))
 
-        self.studies = StudyList(studies.dataframe.studyId)
+        if self.studies is None:
+            self.studies = StudyList(studies.dataframe.studyId)
 
         if as_dataframe:
             studies = studies.dataframe
 
         return studies
 
-    def get_concepts(self, study, hal=False):
-        raise NotImplementedError("Call not available for API V2.")
+    def get_concepts(self, **kwargs):
+        q = Query(handle='/v2/concepts')
+        return json_normalize(self.query(q).get('concepts'))
 
-    def tree_nodes(self, root=None, depth=0, counts=True, tags=True, hal=False):
+    def tree_nodes(self, root=None, depth=0, counts=False, tags=True, hal=False):
         """
         Return the tree hierarchy
 
@@ -148,36 +208,51 @@ class TransmartV2(TransmartAPIBase):
 
         return tree_nodes
 
-    def get_patient_sets(self):
-        q = Query(handle='/v2/patient_sets')
-        return PatientSets(self.query(q))
-
-    def get_hd_node_data(self, study=None, hd_type='autodetect', genes=None, transcripts=None, concept=None,
-                         patient_set=None, projection='all_data', operator="and"):
+    @default_constraint
+    def get_hd_node_data(self, constraint=None, biomarker_constraint=None, biomarkers: list=None,
+                         biomarker_type='genes', projection='all_data', **kwargs):
         """
-        :param study:
-        :param hd_type:
-        :param genes:
-        :param transcripts:
-        :param concept:
-        :param patient_set:
+        :param constraint:
+        :param biomarker_constraint:
+        :param biomarkers: list of markers to get.
+        :param biomarker_type: ['genes', 'transcripts']
         :param projection: ['all_data', 'zscore', 'log_intensity']
-        :param operator: ['and', 'or']
         :return:
         """
+        if biomarker_constraint is None:
+            biomarker_constraint = BiomarkerConstraint(biomarkers=biomarkers,
+                                                       biomarker_type=biomarker_type)
 
         q = Query(handle='/v2/observations',
-                  method='POST',
-                  params={'type': hd_type,
-                          'projection': projection},
-                  in_study=study,
-                  in_patientset=patient_set,
-                  in_concept=concept,
-                  operator=operator,
-                  in_gene_list=genes,
-                  in_transcript_list=transcripts
+                  method='GET',
+                  params=dict(
+                      type='autodetect',
+                      projection=projection,
+                      constraint=str(constraint),
+                      biomarker_constraint=str(biomarker_constraint))
                   )
-        q.json = q.params
-        q._params = {}
 
         return ObservationSetHD(self.query(q))
+
+    @default_constraint
+    def dimension_elements(self, dimension, constraint=None, **kwargs):
+        q = Query(handle='/v2/dimensions/{}/elements'.format(dimension),
+                  method='GET',
+                  params=dict(
+                      constraint=str(constraint))
+                  )
+
+        return self.query(q)
+
+    def get_relation_types(self):
+        q = Query(handle='/v2/pedigree/relation_types')
+        return self.query(q)
+
+    def get_supported_fields(self):
+        q = Query(handle='/v2/supported_fields')
+        return self.query(q)
+
+    def new_constraint(self, *args, **kwargs):
+        return ObservationConstraint(api=self, *args, **kwargs)
+
+    new_constraint.__doc__ = ObservationConstraint.__init__.__doc__

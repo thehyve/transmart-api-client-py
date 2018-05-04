@@ -1,4 +1,5 @@
 from pandas.io.json import json_normalize
+from ..commons import get_dict_identity
 
 
 def _format_observations(observations_result):
@@ -98,15 +99,25 @@ class StudyList:
         for study_id in study_list:
             self.__dict__[study_id.replace('-', '_')] = study_id
 
+    def __len__(self):
+        return len(self.__dict__.keys())
+
 
 class TreeNodes:
 
     def __init__(self, json):
         self.json = json
+        self.identity = get_dict_identity(self.json, fields=['children', 'tree_nodes', 'conceptPath'])
         self.dataframe = json_normalize(self.create_list())
+        self.tree_dict = self.create_tree_dict()
 
     def __repr__(self):
         return self.pretty()
+
+    def create_tree_dict(self):
+        filled_tree = self.dataframe.fillna('')
+        concepts_sub_tree = filled_tree[filled_tree['type'] != 'UNKNOWN']
+        return concepts_sub_tree.set_index('fullName').T.to_dict()
 
     def pretty(self, root=None, depth=0, spacing=2):
         """
@@ -142,12 +153,41 @@ class TreeNodes:
             s += self.create_list(child)
         
         return s
-        
+
+
+class Patients:
+
+    def __init__(self, json):
+        self.json = json
+        self.dataframe = json_normalize(json.get('patients'))
 
 
 class PatientSets:
 
     def __init__(self, json):
         self.json = json
-        self.dataframe = json_normalize(json.get('patientSets'))
+        self.dataframe = json_normalize(json.get('patientSets', json))
+
+
+class RelationTypes:
+
+    def __init__(self, json):
+        if json.get('httpStatus'):
+            msg = 'Response code: {}. {!r}.'.format(json.get('httpStatus'), json.get('message'))
+            print(msg)
+            return
+        for entry in json.get('relationTypes'):
+            label = entry.get('label')
+            description = entry.get('description') or label
+
+            self.__dict__[description] = label
+
+    def __getitem__(self, item):
+        return self.__dict__[item]
+
+    def __setitem__(self, key, value):
+        self.__dict__[key] = value
+
+    def _ipython_key_completions_(self):
+        return list(self.__dict__.keys())
 

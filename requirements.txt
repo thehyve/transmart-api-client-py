@@ -1,3 +1,6 @@
 protobuf
 requests
 pandas
+whoosh
+arrow
+ipywidgets
