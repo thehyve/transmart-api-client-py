@@ -9,12 +9,10 @@ import logging
 import ipywidgets as widgets
 
 from .hypercube import Hypercube
-from .tiles import (
-    HistogramTile, PieTile, CombinedPlot, ScatterPlot, ANIMATION_TIME,
-    NUMERIC_VALUE, STRING_VALUE
-)
+from .single_tiles import HistogramTile, PieTile, ANIMATION_TIME, NUMERIC_VALUE, STRING_VALUE
+from .double_tiles import CombinedPlot, ScatterPlot
 
-from ..constraint_widgets import ConceptPicker
+from ..widgets import ConceptPicker
 from ..query_constraints import ObservationConstraint, Queryable
 from ...commons import filter_tree
 
@@ -60,6 +58,11 @@ class Dashboard:
 
     @debug_view.capture()
     def plotter(self, constraints):
+        """
+        Add a new tile to dashboard by providing tree node constraints.
+
+        :param constraints: constraints from tree node (concepts and study)
+        """
         c = ObservationConstraint.from_tree_node(constraints)
 
         if self.subject_set_id is not None:
@@ -85,12 +88,14 @@ class Dashboard:
 
     @debug_view.capture()
     def link_plotter(self, t1, t2):
-
+        """
+        Combine two tiles and add a new plot to the dashboard.
+        """
         if isinstance(t1, HistogramTile) and isinstance(t2, HistogramTile):
             tile = ScatterPlot(t1, t2, self)
 
         else:
-            return
+            raise ValueError('Combination of tiles not supported.')
 
         self.register(tile)
 
@@ -101,7 +106,7 @@ class Dashboard:
     @linked_tile.setter
     @debug_view.capture()
     def linked_tile(self, tile):
-        print(tile)
+        logger.info('Set tile link: {}'.format(tile))
         if isinstance(tile, (PieTile, HistogramTile)):
             for t in self.tiles:
                 try:

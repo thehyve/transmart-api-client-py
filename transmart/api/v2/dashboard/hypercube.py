@@ -39,6 +39,10 @@ class Hypercube:
 
     @property
     def subject_mask(self):
+        """
+        Controls a boolean mask on subjects. Setting this reduces the
+        values returned by self.query() method.
+        """
         return self.__subjects_mask
 
     @subject_mask.setter
@@ -59,13 +63,24 @@ class Hypercube:
         self.data = self.data.append(sub_set, ignore_index=True)
         self.total_subjects = len(self.data[patient_id].unique())
 
-    def query(self, no_filter=False, **kwargs):
+    def query(self, no_filter=False, **constraint_keywords):
+        """
+        Query the hypercube for all values currently present based on constraints.
+        Constraints have to be provided as keyword arguments where the value is either
+        either a string that matches the value to look for, or a collection of strings
+        to look for. Collections can be provided as a set, list, or pd.Series.
+
+        :param no_filter: if this hypercube has a subject
+            mask, set this to True to bypass it.
+        :param constraint_keywords: Possible keywords [concept, study, trial_visit, subject, start_time].
+        :return: pd.Dataframe with values.
+        """
         expressions = []
         for kw, column in dimensions.items():
-            if kw not in kwargs:
+            if kw not in constraint_keywords:
                 continue
-            parameter = kwargs.get(kw)
-            if isinstance(parameter, (pd.Series, list)):
+            parameter = constraint_keywords.get(kw)
+            if isinstance(parameter, (pd.Series, list, set)):
                 expr = self.data[column].isin(parameter)
             else:
                 expr = self.data[column] == parameter

@@ -2,7 +2,6 @@ import time
 
 import os
 import shutil
-
 from whoosh.fields import Schema, TEXT, NGRAM, NGRAMWORDS
 from whoosh.index import create_in, exists_in, open_dir
 from whoosh.qparser import MultifieldParser, FuzzyTermPlugin
