@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import unittest
-from transmart.api.v2.tm_api_v2 import TransmartV2
+from transmart.api.v2.api import TransmartV2
 
 from tests.mock_server import TestMockServer, retry
 
