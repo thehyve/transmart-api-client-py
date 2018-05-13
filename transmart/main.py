@@ -1,5 +1,5 @@
-from .api.v1.tm_api_v1 import TransmartV1
-from .api.v2.tm_api_v2 import TransmartV2
+from .api.v1.api import TransmartV1
+from .api.v2.api import TransmartV2
 
 
 def get_api(host, api_version=2, user=None, password=None, print_urls=False, **kwargs):

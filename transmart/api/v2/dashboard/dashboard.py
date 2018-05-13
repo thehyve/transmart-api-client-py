@@ -13,7 +13,7 @@ from .single_tiles import HistogramTile, PieTile, ANIMATION_TIME, NUMERIC_VALUE,
 from .double_tiles import CombinedPlot, ScatterPlot
 
 from ..widgets import ConceptPicker
-from ..query_constraints import ObservationConstraint, Queryable
+from ..constraints import ObservationConstraint, Queryable
 from ...commons import filter_tree
 
 logger = logging.getLogger(__name__)
