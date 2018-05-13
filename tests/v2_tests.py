@@ -14,7 +14,7 @@ class V2TestCase(TestMockServer):
 
     @retry
     def test_get_patients(self):
-        patients = self.api.get_patients().json.get('patients')
+        patients = self.api.patients().json.get('patients')
         self.assertEqual(4, len(patients))
 
     @retry

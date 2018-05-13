@@ -32,7 +32,7 @@ class Dashboard:
 
         if isinstance(patients, Queryable):
             self.subject_set_id = api.create_patient_set(repr(patients), patients).get('id')
-            counts = api.get_observations.counts_per_study_and_concept(
+            counts = api.observations.counts_per_study_and_concept(
                 subject_set_id=self.subject_set_id
             )
             self.nodes = filter_tree(api.tree_dict, counts)
@@ -68,7 +68,7 @@ class Dashboard:
         if self.subject_set_id is not None:
             c.subject_set_id = self.subject_set_id
 
-        obs = self.api.get_observations(c)
+        obs = self.api.observations(c)
         self.hypercube.add_variable(obs.dataframe)
 
         name = obs.dataframe['concept.name'][0]

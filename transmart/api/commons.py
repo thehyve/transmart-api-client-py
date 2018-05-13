@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import arrow
+from functools import wraps
 from hashlib import sha1
 
 INPUT_DATE_FORMATS = ['D-M-YYYY', 'YYYY-M-D']
@@ -54,3 +55,26 @@ def filter_tree(tree_dict, counts_per_study_and_concept):
             if v.get('conceptCode') in concepts
             and v.get('studyId') in (*studies, None)
             }
+
+
+def input_check(types):
+    """
+    :param types: tuple of allowed types.
+    :return: decorator that validates input of property setter.
+    """
+    if not isinstance(types, tuple):
+        msg = 'Input check types has to be tuple, got {!r}'.format(type(types))
+        raise ValueError(msg)
+
+    def input_check_decorator(func):
+        @wraps(func)
+        def wrapper(self, value):
+
+            if value is not None:
+                if type(value) not in types:
+                    raise ValueError('Expected type {!r} for {!r}, but got {!r}'.
+                                     format(types, func.__name__, type(value)))
+            return func(self, value)
+        return wrapper
+    return input_check_decorator
+
