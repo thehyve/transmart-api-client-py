@@ -12,9 +12,9 @@ from functools import wraps
 from pandas.io.json import json_normalize
 
 from .concept_search import ConceptSearcher
+from .constraints import ObservationConstraint, Queryable, BiomarkerConstraint
 from .data_structures import (ObservationSet, ObservationSetHD, TreeNodes, Patients,
                               PatientSets, Studies, StudyList, RelationTypes)
-from .query_constraints import Query, ObservationConstraint, Queryable, BiomarkerConstraint
 from ..tm_api_base import TransmartAPIBase
 
 logger = logging.getLogger('tm-api')
@@ -28,6 +28,21 @@ def default_constraint(func):
                 kwargs['constraint'] = ObservationConstraint(**kwargs)
         return func(*args, **kwargs)
     return wrapper
+
+
+class Query:
+    """ Utility to build queries for transmart v2 api. """
+
+    def __init__(self, handle=None, method='GET', params=None, hal=False, json=None):
+        self.handle = handle
+        self.method = method
+        self.hal = hal
+        self.params = params
+        self.json = json
+
+    @property
+    def headers(self):
+        return {'Accept': 'application/{};charset=UTF-8'.format('hal+json' if self.hal else 'json')}
 
 
 class TransmartV2(TransmartAPIBase):
@@ -90,7 +105,7 @@ class TransmartV2(TransmartAPIBase):
         return r.json()
 
     @default_constraint
-    def get_observations(self, constraint=None, as_dataframe=False, **kwargs):
+    def observations(self, constraint=None, as_dataframe=False, **kwargs):
         """
         Get observations, from the main table in the transmart data model.
 
@@ -122,10 +137,10 @@ class TransmartV2(TransmartAPIBase):
             return self.query(q)
 
         func.__doc__ = doc
-        self.get_observations.__dict__[handle] = default_constraint(func)
+        self.observations.__dict__[handle] = default_constraint(func)
 
     @default_constraint
-    def get_patients(self, constraint=None, **kwargs):
+    def patients(self, constraint=None, **kwargs):
         """
         Get patients.
 
@@ -136,7 +151,7 @@ class TransmartV2(TransmartAPIBase):
         q = Query(handle='/v2/patients', method='POST', json={'constraint': constraint.json()})
         return Patients(self.query(q))
 
-    def get_patient_sets(self, patient_set_id=None):
+    def patient_sets(self, patient_set_id=None):
         q = Query(handle='/v2/patient_sets')
 
         if patient_set_id:
@@ -181,7 +196,7 @@ class TransmartV2(TransmartAPIBase):
 
         return studies
 
-    def get_concepts(self, **kwargs):
+    def concepts(self, **kwargs):
         q = Query(handle='/v2/concepts')
         return json_normalize(self.query(q).get('concepts'))
 
@@ -248,7 +263,7 @@ class TransmartV2(TransmartAPIBase):
         q = Query(handle='/v2/pedigree/relation_types')
         return self.query(q)
 
-    def get_supported_fields(self):
+    def supported_fields(self):
         q = Query(handle='/v2/supported_fields')
         return self.query(q)
 
