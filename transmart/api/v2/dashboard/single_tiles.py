@@ -6,9 +6,9 @@
 
 import logging
 
+import abc
 import bqplot as plt
 import ipywidgets as widgets
-import pandas as pd
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -21,7 +21,11 @@ STRING_VALUE = 'stringValue'
 ANIMATION_TIME = 1000
 
 
-class Tile:
+class Tile(abc.ABC):
+    """
+    Abstract base class that can be implemented to create tiles for
+    to be registered to a dashboard instance.
+    """
 
     def __init__(self, dash, title, concept, study=None):
         self.dash = dash
@@ -63,28 +67,35 @@ class Tile:
             with self.fake_out:
                 self.dash.tiles.remove(self)
                 self.dash.remove(fig_box)
+
         return remove_fig
 
     def linker(self):
         def callback(btn):
             self.dash.linked_tile = self
+
         return callback
 
+    @abc.abstractmethod
     def create_fig(self):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def set_values(self, values):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def _calc_selected_subjects(self, *args):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def refresh(self):
-        raise NotImplementedError
+        pass
 
     @property
+    @abc.abstractmethod
     def value_type(self):
-        raise NotImplementedError
+        pass
 
     def get_updates(self):
         subset = self.dash.hypercube.query(concept=self.concept, study=self.study)
@@ -164,12 +175,13 @@ class HistogramTile(Tile):
         values = self.fig.marks[0].sample
 
         with self.fig.hold_sync():
-            self.set_values([])  # TODO better way to make brush selector reliable.
+            self.set_values([])  # TODO better way to make brush selector reliable, and removable.
             self.set_values(values)
 
-        self.fig.interaction.reset()
-        self.fig.interaction.selected = []
-        print('Selected: ', self.fig.interaction.selected)
+            self.fig.interaction.reset()
+            self.fig.interaction.selected = []
+
+        logger.info('Selected: ', self.fig.interaction.selected)
 
 
 class PieTile(Tile):
@@ -177,7 +189,7 @@ class PieTile(Tile):
 
     @debug_view.capture(clear_output=False)
     def create_fig(self, *args):
-        print('Creating figure.')
+        logger.info('Creating figure.')
 
         tooltip_widget = plt.Tooltip(fields=['size', 'label'])
         pie = plt.Pie(tooltip=tooltip_widget,
@@ -188,7 +200,7 @@ class PieTile(Tile):
         pie.font_weight = 'bold'
         pie.selected_style = {"opacity": "1", "stroke": "white", "stroke-width": "4"}
         pie.unselected_style = {"opacity": "0.5"}
-        print('Returning figure.')
+        logger.info('Returning figure.')
 
         return plt.Figure(marks=[pie])
 
@@ -232,66 +244,3 @@ class PieTile(Tile):
 
     def refresh(self):
         self.fig.marks[0].selected = None
-
-
-class CombinedPlot:
-
-    def __init__(self, t1, t2, dash):
-        self.t1 = t1
-        self.t2 = t2
-        self.dash = dash
-        self.df = None
-        self.mark = None
-        self.fig = None
-
-        self.create_fig()
-        self.get_updates()
-
-    def get_fig(self):
-        return self.fig
-
-    def create_fig(self):
-        raise NotImplementedError
-
-    def get_updates(self):
-        raise NotImplementedError
-
-    def refresh(self):
-        pass
-
-
-class ScatterPlot(CombinedPlot):
-
-    @staticmethod
-    def get_values(tile):
-        df = tile.dash.hypercube.query(study=tile.study, concept=tile.concept)
-        non_empty = pd.notnull(df.numericValue)
-        df = df.loc[non_empty, ['patient.id', 'numericValue']]
-        return df
-
-    def get_updates(self):
-        mask = self.dash.hypercube.subject_mask
-
-        if mask is not None:
-            filter_ = self.df['patient.id'].isin(mask)
-        else:
-            filter_ = self.df.index
-
-        with self.fig.hold_sync():
-            self.mark.x = self.df.loc[filter_, 'numericValue_x']
-            self.mark.y = self.df.loc[filter_, 'numericValue_y']
-
-    def create_fig(self):
-        t1_values = self.get_values(self.t1)
-        t2_values = self.get_values(self.t2)
-        self.df = t1_values.merge(t2_values, how='inner', on='patient.id')
-
-        sc_x = plt.LinearScale()
-        sc_y = plt.LinearScale()
-
-        self.mark = plt.Scatter(scales={'x': sc_x, 'y': sc_y}, default_size=16)
-
-        ax_x = plt.Axis(scale=sc_x, label=self.t1.title)
-        ax_y = plt.Axis(scale=sc_y, label=self.t2.title, orientation='vertical')
-        self.fig = plt.Figure(marks=[self.mark], axes=[ax_x, ax_y])
-

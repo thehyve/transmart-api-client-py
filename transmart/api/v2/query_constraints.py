@@ -9,7 +9,7 @@ import arrow
 
 from functools import wraps
 from ..commons import date_to_timestamp, INPUT_DATE_FORMATS
-from .constraint_widgets import ConceptPicker, ConstraintWidget
+from .widgets import ConceptPicker, ConstraintWidget
 
 END_OF_DAY_FMT = 'YYYY-MM-DDT23:59:59ZZ'
 START_OF_DAY_FMT = 'YYYY-MM-DDT00:00:00ZZ'
