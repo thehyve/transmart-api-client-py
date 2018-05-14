@@ -30,6 +30,15 @@ def default_constraint(func):
     return wrapper
 
 
+def add_to_queryable(func):
+    """
+    This decorator allows registration a method to an ConstraintsObjects,
+    so it can be accessed more easily.
+    """
+    func.__query_method__ = True
+    return func
+
+
 class Query:
     """ Utility to build queries for transmart v2 api. """
 
@@ -105,6 +114,7 @@ class TransmartV2(TransmartAPIBase):
         return r.json()
 
     @default_constraint
+    @add_to_queryable
     def observations(self, constraint=None, as_dataframe=False, **kwargs):
         """
         Get observations, from the main table in the transmart data model.
@@ -137,9 +147,10 @@ class TransmartV2(TransmartAPIBase):
             return self.query(q)
 
         func.__doc__ = doc
-        self.observations.__dict__[handle] = default_constraint(func)
+        self.observations.__dict__[handle] = add_to_queryable(default_constraint(func))
 
     @default_constraint
+    @add_to_queryable
     def patients(self, constraint=None, **kwargs):
         """
         Get patients.
@@ -160,6 +171,7 @@ class TransmartV2(TransmartAPIBase):
         return PatientSets(self.query(q))
 
     @default_constraint
+    @add_to_queryable
     def create_patient_set(self, name: str, constraint=None, **kwargs):
         """
         Create a patient set that can be reused at a later stage.
@@ -224,6 +236,7 @@ class TransmartV2(TransmartAPIBase):
         return tree_nodes
 
     @default_constraint
+    @add_to_queryable
     def get_hd_node_data(self, constraint=None, biomarker_constraint=None, biomarkers: list=None,
                          biomarker_type='genes', projection='all_data', **kwargs):
         """
@@ -250,6 +263,7 @@ class TransmartV2(TransmartAPIBase):
         return ObservationSetHD(self.query(q))
 
     @default_constraint
+    @add_to_queryable
     def dimension_elements(self, dimension, constraint=None, **kwargs):
         q = Query(handle='/v2/dimensions/{}/elements'.format(dimension),
                   method='GET',
