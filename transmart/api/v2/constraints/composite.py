@@ -149,6 +149,23 @@ class GroupConstraint(Queryable):
         }
 
 
+def _find_query_methods(obj):
+    for method_name in dir(obj):
+        if method_name.startswith('__'):
+            continue
+
+        method = getattr(obj, method_name)
+        if getattr(method, '__query_method__', False):
+            yield method_name, method
+
+
+def override_defaults(method, **defaults):
+    @wraps(method)
+    def wrapper(*args, **kwargs):
+        return method(*args, **defaults, **kwargs)
+    return wrapper
+
+
 class ObservationConstraint(Queryable, Grouper):
     """
     Represents constraints on observation level. This is the set of
@@ -223,6 +240,9 @@ class ObservationConstraint(Queryable, Grouper):
 
         if api is not None:
             self._details_widget = ConstraintWidget(self)
+
+            for name, method in _find_query_methods(api):
+                self.__dict__[name] = self._constraint_method_factory(method)
 
         self.concept = concept
         self.trial_visit = trial_visit
@@ -302,6 +322,18 @@ class ObservationConstraint(Queryable, Grouper):
 
         finally:
             self.subselection = current
+
+    def _constraint_method_factory(self, method):
+        @wraps(method)
+        def wrapper(*args, **kwargs):
+            func = override_defaults(method, api=self.api, constraint=self)
+            return func(*args, **kwargs)
+
+        # Also set defaults of the observation call children
+        for name, child in _find_query_methods(method):
+            wrapper.__dict__[name] = override_defaults(child, api=self.api, constraint=self)
+
+        return wrapper
 
     @property
     def trial_visit(self):
