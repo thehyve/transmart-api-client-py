@@ -7,3 +7,4 @@ build/
 dist/
 transmart.egg-info/
 transmart/__pycache__/
+!examples/*
