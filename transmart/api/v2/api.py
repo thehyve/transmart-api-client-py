@@ -15,7 +15,7 @@ from .concept_search import ConceptSearcher
 from .constraints import ObservationConstraint, Queryable, BiomarkerConstraint
 from .data_structures import (ObservationSet, ObservationSetHD, TreeNodes, Patients,
                               PatientSets, Studies, StudyList, RelationTypes)
-from ..tm_api_base import TransmartAPIBase
+from ..auth import get_auth
 
 logger = logging.getLogger('tm-api')
 
@@ -54,25 +54,30 @@ class Query:
         return {'Accept': 'application/{};charset=UTF-8'.format('hal+json' if self.hal else 'json')}
 
 
-class TransmartV2(TransmartAPIBase):
-    """ Connect to tranSMART using Python. """
+class TransmartV2:
+    """ Connect to tranSMART v2 API using Python. """
 
-    def __init__(self, host, user=None, password=None, print_urls=False, interactive=True):
+    def __init__(self, host, user=None, password=None, kc_url=None, kc_realm=None, print_urls=False, interactive=True):
         """
         Create the python transmart client by providing user credentials.
 
         :param host: a transmart URL (e.g. http://transmart-test.thehyve.net)
         :param user: if not given, it asks for it.
         :param password: if not given, it asks for it.
+        :param kc_url: KeyCloak hostname (e.g. https://keycloak-test.thehyve.net)
+        :param kc_realm: Realm that is registered for the transmart api host to listen.
         :param print_urls: print the url of handles being used.
         :param interactive: automatically build caches for interactive use.
         """
-        super().__init__(host, user, password, print_urls)
         self.studies = None
         self.tree_dict = None
         self.search_tree_node = None
         self.relation_types = None
+        self.host = host
         self.interactive = interactive
+        self.print_urls = print_urls
+
+        self.auth = get_auth(host, user, password, kc_url, kc_realm)
 
         self._observation_call_factory('aggregates_per_concept')
         self._observation_call_factory('counts')
@@ -101,7 +106,7 @@ class TransmartV2(TransmartAPIBase):
         url = "{}{}".format(self.host, q.handle)
 
         headers = q.headers
-        headers['Authorization'] = 'Bearer ' + self.access_token
+        headers['Authorization'] = 'Bearer ' + self.auth.access_token
 
         if q.method.upper() == 'GET':
             r = requests.get(url, params=q.params, headers=headers)
@@ -237,7 +242,7 @@ class TransmartV2(TransmartAPIBase):
 
     @default_constraint
     @add_to_queryable
-    def get_hd_node_data(self, constraint=None, biomarker_constraint=None, biomarkers: list=None,
+    def get_hd_node_data(self, constraint=None, biomarker_constraint=None, biomarkers: list = None,
                          biomarker_type='genes', projection='all_data', **kwargs):
         """
         :param constraint:

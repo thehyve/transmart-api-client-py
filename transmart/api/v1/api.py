@@ -22,22 +22,26 @@ from .highdim_pb2 import HighDimHeader
 from .highdim_pb2 import Row
 import urllib
 
-from ..tm_api_base import TransmartAPIBase
+from ..auth import get_auth
 
 
-class TransmartV1(TransmartAPIBase):
-    """ Connect to tranSMART using Python. """
+class TransmartV1:
+    """ Connect to tranSMART V1 api using Python. """
 
-    def __init__(self, host, user=None, password=None, print_urls=False):
+    def __init__(self, host, user=None, password=None, kc_url=None, kc_realm=None, print_urls=False):
         """
         Create the python transmart client by providing user credentials.
 
         :param host: a transmart URL (e.g. http://transmart-test.thehyve.net)
         :param user: if not given, it asks for it.
         :param password: if not given, it asks for it.
+        :param kc_url: KeyCloak hostname (e.g. https://keycloak-test.thehyve.net).
+        :param kc_realm: Realm that is registered for the transmart api host to listen.
         :param print_urls: print the url of handles being used.
         """
-        super().__init__(host, user, password, print_urls)
+        self.host = host
+        self.print_urls = print_urls
+        self.auth = get_auth(host, user, password, kc_url, kc_realm)
 
     def get_observations(self, study=None, patientSet=None, as_dataframe=True, hal=False):
         """
@@ -125,8 +129,8 @@ class TransmartV1(TransmartAPIBase):
 
         headers = {}
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
-        if self.access_token is not None:
-            headers['Authorization'] = 'Bearer ' + self.access_token
+        if self.auth.access_token is not None:
+            headers['Authorization'] = 'Bearer ' + self.auth.access_token
         r = requests.post(url, headers=headers)
         r.raise_for_status()
         return r.json()
@@ -136,10 +140,11 @@ class TransmartV1(TransmartAPIBase):
         if self.print_urls:
             print(url)
 
-        headers = {}
-        headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
-        if self.access_token is not None:
-            headers['Authorization'] = 'Bearer ' + self.access_token
+        headers = {
+            'Accept': 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
+        }
+        if self.auth.access_token is not None:
+            headers['Authorization'] = 'Bearer ' + self.auth.access_token
 
         r = requests.get(url, headers=headers)
         r.raise_for_status()
@@ -165,8 +170,8 @@ class TransmartV1(TransmartAPIBase):
         headers = {
             'Accept': 'application/octet-stream'
         }
-        if self.access_token is not None:
-            headers['Authorization'] = 'Bearer ' + self.access_token
+        if self.auth.access_token is not None:
+            headers['Authorization'] = 'Bearer ' + self.auth.access_token
         req = urllib.request.Request(url, headers=headers)
         return self._parse_protobuf(urllib.request.urlopen(req).read())
 
