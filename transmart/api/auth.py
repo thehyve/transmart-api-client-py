@@ -11,7 +11,8 @@ class Authenticator(metaclass=abc.ABCMeta):
         self.user = username or input('Username: ')
         self.password = password
         self.realm = realm
-        self._access_token = self.get_token()
+        self._access_token = None
+        self.get_token()
 
     @property
     @abc.abstractmethod
@@ -54,10 +55,10 @@ class LegacyAuth(Authenticator):
 
         r.raise_for_status()
 
-        return r.json().get('access_token')
+        self._access_token = r.json().get('access_token')
 
     def refresh(self):
-        self._access_token = self.get_token()
+        self.get_token()
 
 
 class KeyCloakAuth(Authenticator):
@@ -97,8 +98,7 @@ class KeyCloakAuth(Authenticator):
             self.timeout = time.time() + r.json().get('expires_in')
 
         self.refresh_token = r.json().get('refresh_token')
-
-        return r.json().get('access_token')
+        self._access_token = r.json().get('access_token')
 
     def refresh(self):
         r = requests.post(
@@ -109,7 +109,12 @@ class KeyCloakAuth(Authenticator):
                 client_id=self.client_id,
             )
         )
-        if self.timeout is not None:
+
+        if r.json().get('error') == 'invalid_grant':
+            self.get_token()
+            return
+
+        if r.json().get('expires_in'):
             self.timeout = time.time() + r.json().get('expires_in')
 
         self._access_token = r.json().get('access_token')
