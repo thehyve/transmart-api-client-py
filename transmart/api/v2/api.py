@@ -10,6 +10,7 @@ from urllib.parse import unquote_plus
 import requests
 from functools import wraps
 from pandas.io.json import json_normalize
+from json import JSONDecodeError
 
 from .concept_search import ConceptSearcher
 from .constraints import ObservationConstraint, Queryable, BiomarkerConstraint
@@ -79,6 +80,10 @@ class TransmartV2:
 
         self.auth = get_auth(host, user, password, kc_url, kc_realm)
 
+        self._admin_call_factory('/v2/system/after_data_loading_update')
+        self._admin_call_factory('/v2/tree_nodes/clear_cache')
+        self._admin_call_factory('/v2/tree_nodes/rebuild_status')
+
         self._observation_call_factory('aggregates_per_concept')
         self._observation_call_factory('counts')
         self._observation_call_factory('counts_per_concept')
@@ -117,6 +122,23 @@ class TransmartV2:
             print(unquote_plus(r.url))
 
         return r.json()
+
+    def admin(self):
+        """
+        Does nothing, but provide administrative functions via dot notation.
+        """
+
+    def _admin_call_factory(self, handle, doc=None):
+        def func():
+            q = Query(handle=handle, method='GET')
+            try:
+                return self.query(q)
+            except JSONDecodeError:
+                print('Not a valid JSON response. Returning None.')
+
+        func.__doc__ = doc
+        name = handle.split('/')[-1]  # pick last part of handle as name.
+        self.admin.__dict__[name] = func
 
     @default_constraint
     @add_to_queryable

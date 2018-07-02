@@ -18,6 +18,7 @@ class Authenticator(metaclass=abc.ABCMeta):
     def client_id(self):
         pass
 
+    @property
     @abc.abstractmethod
     def access_token(self) -> str:
         pass
