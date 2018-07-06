@@ -28,7 +28,8 @@ from ..auth import get_auth
 class TransmartV1:
     """ Connect to tranSMART V1 api using Python. """
 
-    def __init__(self, host, user=None, password=None, kc_url=None, kc_realm=None, print_urls=False):
+    def __init__(self, host, user=None, password=None, kc_url=None,
+                 kc_realm=None, print_urls=False, *args, **kwargs):
         """
         Create the python transmart client by providing user credentials.
 

@@ -3,7 +3,7 @@ from .api.v2.api import TransmartV2
 
 
 def get_api(host, api_version=2, user=None, password=None, kc_url=None,
-            kc_realm=None, print_urls=False, interactive=None, **kwargs):
+            kc_realm=None, print_urls=False, interactive=True, **kwargs):
     """
     Create the python transmart client by providing user credentials.
 
@@ -23,4 +23,11 @@ def get_api(host, api_version=2, user=None, password=None, kc_url=None,
 
     api = TransmartV1 if api_version == 1 else TransmartV2
 
-    return api(host, user, password, kc_url, kc_realm, print_urls, interactive, **kwargs)
+    return api(host=host,
+               user=user,
+               password=password,
+               kc_url=kc_url,
+               kc_realm=kc_realm,
+               print_urls=print_urls,
+               interactive=interactive,
+               **kwargs)
