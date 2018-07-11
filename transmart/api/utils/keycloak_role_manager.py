@@ -1,5 +1,10 @@
 import requests
+import logging
+import click
+
 from ..auth import KeyCloakAuth
+
+logger = logging.getLogger('tm-api')
 
 
 class KeyCloakRoleManagerException(Exception):
@@ -84,15 +89,11 @@ class KeyCloakRoleManager:
             raise KeyCloakRoleManagerException(msg)
         return clients[0]
 
-    @property
-    def current_roles(self):
-        """ Get the set of all study IDs currently in KeyCloak. """
+    def get_current_roles(self):
+        """ Get the set of all study roles currently in KeyCloak. """
         r = requests.get(url=self.roles_url, headers=self._headers)
         r.raise_for_status()
-        return {
-            role['name'].split('|')[0]
-            for role in r.json()
-        }
+        return {role['name'] for role in r.json()}
 
     @staticmethod
     def get_role_representation(name, description):
@@ -102,7 +103,15 @@ class KeyCloakRoleManager:
             "description": description
         }
 
-    def add_single_study_roles(self, study_id, study_description=None):
+    def add_single_study_roles(self, study_id: str, study_description: str=None):
+        """
+        Try to add all roles in self.STUDY_ROLES to KeyCloak for a given
+        study id. If the role already exists, nothing happens.
+
+        :param study_id: transmart study_id
+        :param study_description: a optional name for the study which will
+            be used in the role description in KeyCloak.
+        """
         if not study_description:
             study_description = study_id
 
@@ -113,23 +122,52 @@ class KeyCloakRoleManager:
                 url=self.roles_url,
                 headers=self._headers,
                 json=self.get_role_representation(name, desc))
-            r.raise_for_status()
-        print('Added roles for {!r}.'.format(study_id))
+
+            if 200 <= r.status_code <= 299:
+                print('Added role {!r} for {!r}.'.format(role, study_id))
 
     def add_all_studies(self):
-        # studyId, tree path tuples
-        studies = [
-            (v.get('studyId'), k)
-            for k, v in self.api.tree_dict.items()
-            if 'STUDY' in v.get('visualAttributes')
-        ]
+        """
+        Calls self.add_single_study_roles() for all studies in transmart.
+        """
+        study_ids = [s.get('studyId') for s in self.api.get_studies().get('studies')]
 
-        current_roles = self.current_roles
+        for study in study_ids:
+            self.add_single_study_roles(study)
 
-        for study, path in studies:
-            if study in current_roles:
-                print('Already have {!r}, skipping..'.format(study))
-                continue
 
-            self.add_single_study_roles(study, path)
+def run_role_manager(transmart, kc_url, realm, user=None, password=None, study=None):
+    import transmart as tm
 
+    api = tm.get_api(
+        host=transmart,
+        api_version=2,
+        user=user,
+        password=password,
+        kc_url=kc_url,
+        kc_realm=realm,
+        print_urls=True,
+        interactive=False
+    )
+
+    kc_manager = KeyCloakRoleManager(api)
+    if study:
+        kc_manager.add_single_study_roles(study)
+    else:
+        kc_manager.add_all_studies()
+
+
+@click.command()
+@click.option('-t', '--transmart', required=True,
+              help='tranSMART host url, e.g. https://transmart-dev.thehyve.net.')
+@click.option('-k', '--kc-url', required=True,
+              help='KeyCloak host, e.g. https://keycloak-dwh-test.thehyve.net.')
+@click.option('-r', '--realm', help='KeyCloak realm.', required=True)
+@click.option('-u', '--user', help='KeyCloak username.')
+@click.option('-p', '--password', default=None,
+              help='KeyCloak password, will be asked for if not provided.')
+@click.option('-s', '--study', default=None,
+              help='Add roles for this study IDs. If not provided, add all studies.')
+@click.version_option(prog_name="Add roles from tranSMART to KeyCloak.")
+def _role_manager_entry_point(*args, **kwargs):
+    run_role_manager(*args, **kwargs)

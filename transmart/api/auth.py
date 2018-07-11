@@ -49,7 +49,7 @@ class LegacyAuth(Authenticator):
                 username=self.user
             ),
             data=dict(
-                password=self.password or getpass("Password: ")
+                password=self.password or getpass("tranSMART password: ")
             )
         )
 
@@ -87,7 +87,7 @@ class KeyCloakAuth(Authenticator):
                 grant_type='password',
                 client_id=self.client_id,
                 username=self.user,
-                password=self.password or getpass("Password: "),
+                password=self.password or getpass("KeyCloak password: "),
                 scope='offline'
             )
         )

@@ -1,5 +1,8 @@
-from pandas.io.json import json_normalize
-from ..commons import get_dict_identity
+import transmart
+
+if transmart.dependency_mode == "FULL":
+    from pandas.io.json import json_normalize
+    from ..commons import get_dict_identity
 
 
 def _format_observations(observations_result):

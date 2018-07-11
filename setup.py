@@ -21,6 +21,8 @@ if os.environ.get('READTHEDOCS') == 'True':
             if package.startswith(dependency):
                 required_packages.remove(package)
 
+minimal = ["requests", "click"]
+backend = ["pandas", "arrow"]
 
 setuptools.setup(
     name="transmart",
@@ -39,7 +41,16 @@ setuptools.setup(
 
     download_url='https://github.com/thehyve/transmart-api-client-py/tarball/{}/'.format(version_string),
 
-    install_requires=required_packages,
+    install_requires=minimal,
+
+    extras_require={
+        "backend": backend,
+        "full": required_packages},
+    entry_points={
+        'console_scripts': [
+            'transmart-keycloak = transmart.api.utils.keycloak_role_manager:_role_manager_entry_point'
+        ]
+    },
 
     classifiers=[
         'Programming Language :: Python',

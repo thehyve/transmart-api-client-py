@@ -12,17 +12,18 @@
 * Modified by Laura Madrid on 08/03/2017
 * in order to make it compatible with transmart v16.2
 """
+import transmart
+if transmart.dependency_mode == 'FULL':
+    import requests
 
-import requests
+    import google.protobuf.internal.decoder as decoder
+    from pandas.io.json import json_normalize
 
-import google.protobuf.internal.decoder as decoder
-from pandas.io.json import json_normalize
+    from .highdim_pb2 import HighDimHeader
+    from .highdim_pb2 import Row
+    import urllib
 
-from .highdim_pb2 import HighDimHeader
-from .highdim_pb2 import Row
-import urllib
-
-from ..auth import get_auth
+    from ..auth import get_auth
 
 
 class TransmartV1:

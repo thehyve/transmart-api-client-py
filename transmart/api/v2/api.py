@@ -4,19 +4,26 @@
 * version 3.
 """
 
+import transmart
+
 import logging
+from functools import wraps
+from json import JSONDecodeError
 from urllib.parse import unquote_plus
 
 import requests
-from functools import wraps
-from pandas.io.json import json_normalize
-from json import JSONDecodeError
-
-from .concept_search import ConceptSearcher
-from .constraints import ObservationConstraint, Queryable, BiomarkerConstraint
-from .data_structures import (ObservationSet, ObservationSetHD, TreeNodes, Patients,
-                              PatientSets, Studies, StudyList, RelationTypes)
 from ..auth import get_auth
+
+if transmart.dependency_mode == 'FULL':
+
+    from .concept_search import ConceptSearcher
+    from .constraints import ObservationConstraint, Queryable, BiomarkerConstraint
+
+if transmart.dependency_mode in ('FULL', 'BACKEND'):
+    from pandas.io.json import json_normalize
+    from .data_structures import (ObservationSet, ObservationSetHD, TreeNodes, Patients,
+                                  PatientSets, Studies, StudyList, RelationTypes)
+
 
 logger = logging.getLogger('tm-api')
 
@@ -82,6 +89,7 @@ class TransmartV2:
 
         self._admin_call_factory('/v2/system/after_data_loading_update')
         self._admin_call_factory('/v2/tree_nodes/clear_cache')
+        self._admin_call_factory('/v2/tree_nodes/rebuild_cache')
         self._admin_call_factory('/v2/tree_nodes/rebuild_status')
 
         self._observation_call_factory('aggregates_per_concept')
@@ -90,7 +98,7 @@ class TransmartV2:
         self._observation_call_factory('counts_per_study')
         self._observation_call_factory('counts_per_study_and_concept')
 
-        if interactive:
+        if interactive and transmart.dependency_mode == 'FULL':
             self.build_cache()
 
     def build_cache(self):
@@ -215,23 +223,25 @@ class TransmartV2:
 
         return self.query(q)
 
-    def get_studies(self, as_dataframe=False):
+    def get_studies(self, as_json=False):
         """
         Get all studies.
 
-        :param as_dataframe: If True, convert json response to dataframe
-        :return: dataframe or Studies object
+        :param as_json: If True, return direct json response.
+        :return: json or Studies object
         """
 
         q = Query(handle='/v2/studies')
 
-        studies = Studies(self.query(q))
+        json_ = self.query(q)
+
+        if as_json or transmart.dependency_mode == 'MINIMAL':
+            return json_
+
+        studies = Studies(json_)
 
         if self.studies is None:
             self.studies = StudyList(studies.dataframe.studyId)
-
-        if as_dataframe:
-            studies = studies.dataframe
 
         return studies
 
@@ -311,4 +321,7 @@ class TransmartV2:
     def new_constraint(self, *args, **kwargs):
         return ObservationConstraint(api=self, *args, **kwargs)
 
-    new_constraint.__doc__ = ObservationConstraint.__init__.__doc__
+    try:
+        new_constraint.__doc__ = ObservationConstraint.__init__.__doc__
+    except NameError:
+        pass
