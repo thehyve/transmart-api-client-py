@@ -8,4 +8,34 @@ This is meant to work with Python 3.x only.
 
 ## Installation
 
-`pip install transmart`
+`pip3 install transmart` for minimal dependencies, but only administrative calls are available.
+
+`pip3 install transmart[full]` for the full thing.
+
+
+## Usage
+
+### Main client
+See the notebook in `./examples` or go live via the binder link above.
+
+
+### Entry points
+After installing via pip there should be a CLI tool available to add necessary roles to KeyCloak.
+
+```bash
+$ transmart-keycloak --help
+Usage: transmart-keycloak [OPTIONS]
+
+Options:
+  -t, --transmart TEXT  tranSMART host url, e.g. https://transmart-
+                        dev.thehyve.net.  [required]
+  -k, --kc-url TEXT     KeyCloak host, e.g. https://keycloak-dwh-
+                        test.thehyve.net.  [required]
+  -r, --realm TEXT      KeyCloak realm.  [required]
+  -u, --user TEXT       KeyCloak username.
+  -p, --password TEXT   KeyCloak password, will be asked for if not provided.
+  -s, --study TEXT      Add roles for this study IDs. If not provided, add all
+                        studies.
+  --version             Show the version and exit.
+  --help                Show this message and exit.
+```
