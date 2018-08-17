@@ -87,10 +87,9 @@ class TransmartV2:
 
         self.auth = get_auth(host, user, password, kc_url, kc_realm)
 
-        self._admin_call_factory('/v2/system/after_data_loading_update')
-        self._admin_call_factory('/v2/tree_nodes/clear_cache')
-        self._admin_call_factory('/v2/tree_nodes/rebuild_cache')
-        self._admin_call_factory('/v2/tree_nodes/rebuild_status')
+        self._admin_call_factory('/v2/admin/system/after_data_loading_update')
+        self._admin_call_factory('/v2/admin/system/config')
+        self._admin_call_factory('/v2/admin/system/update_status')
 
         self._observation_call_factory('aggregates_per_concept')
         self._observation_call_factory('counts')

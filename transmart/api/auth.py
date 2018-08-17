@@ -62,7 +62,7 @@ class LegacyAuth(Authenticator):
 
 
 class KeyCloakAuth(Authenticator):
-    client_id = 'transmart-api'
+    client_id = 'transmart-client'
 
     def __init__(self, *args, **kwargs):
         self.refresh_token = None
