@@ -25,7 +25,7 @@ class Authenticator(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_token(self) -> str:
+    def get_token(self):
         pass
 
     @abc.abstractmethod
@@ -87,8 +87,7 @@ class KeyCloakAuth(Authenticator):
                 grant_type='password',
                 client_id=self.client_id,
                 username=self.user,
-                password=self.password or getpass("KeyCloak password: "),
-                scope='offline'
+                password=self.password or getpass("KeyCloak password: ")
             )
         )
 
@@ -106,7 +105,7 @@ class KeyCloakAuth(Authenticator):
             data=dict(
                 grant_type='refresh_token',
                 refresh_token=self.refresh_token,
-                client_id=self.client_id,
+                client_id=self.client_id
             )
         )
 

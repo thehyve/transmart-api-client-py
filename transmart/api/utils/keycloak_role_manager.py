@@ -50,7 +50,7 @@ class KeyCloakRoleManager:
     # Machine + human readable (for description)
     STUDY_ROLES = {
         'MEASUREMENTS': 'Observations for ',
-        'SUMMARY': 'Summary level for ',
+        # 'SUMMARY': 'Summary level for ',
         'COUNTS_WITH_THRESHOLD': 'Threshold summary level for '
     }
 
@@ -130,7 +130,8 @@ class KeyCloakRoleManager:
         """
         Calls self.add_single_study_roles() for all studies in transmart.
         """
-        study_ids = [s.get('studyId') for s in self.api.get_studies().get('studies')]
+        study_ids = [s.get('studyId') for s in self.api.get_studies().get('studies')
+                     if s.get('secureObjectToken') != 'PUBLIC']
 
         for study in study_ids:
             self.add_single_study_roles(study)
