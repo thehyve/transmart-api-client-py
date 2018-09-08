@@ -130,7 +130,7 @@ class KeyCloakRoleManager:
         """
         Calls self.add_single_study_roles() for all studies in transmart.
         """
-        study_ids = [s.get('studyId') for s in self.api.get_studies().get('studies')
+        study_ids = [s.get('studyId') for s in self.api.get_studies(as_json=True).get('studies')
                      if s.get('secureObjectToken') != 'PUBLIC']
 
         for study in study_ids:
