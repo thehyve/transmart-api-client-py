@@ -90,6 +90,7 @@ class TransmartV2:
         self._admin_call_factory('/v2/admin/system/after_data_loading_update')
         self._admin_call_factory('/v2/admin/system/config')
         self._admin_call_factory('/v2/admin/system/update_status')
+        self._admin_call_factory('/v2/admin/system/clear_cache')
 
         self._observation_call_factory('aggregates_per_concept')
         self._observation_call_factory('counts')

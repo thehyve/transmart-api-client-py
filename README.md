@@ -13,10 +13,15 @@ This is meant to work with Python 3.x only.
 `pip3 install transmart[full]` for the full thing.
 
 
+## Demo
+
+[Launch the live demo notebook using Binder](https://mybinder.org/v2/gh/thehyve/transmart-api-client-py/master?urlpath=/lab/tree/examples/Example.ipynb)
+
+
 ## Usage
 
 ### Main client
-See the notebook in `./examples` or go live via the binder link above.
+See the notebook in `./examples` or go live via the binder link above. 
 
 
 ### Entry points
