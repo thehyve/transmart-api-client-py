@@ -27,11 +27,16 @@ class ObservationSetTestCase(unittest.TestCase):
                 },
                 {
                     'name': 'dim2',
+                    'inline': False
+                },
+                {
+                    'name': 'inline_dim1',
+                    'inline': True
                 },
             ],
             'cells': [
                 {
-                    'inlineDimensions': [],
+                    'inlineDimensions': ['inline_dim1 el1'],
                     'dimensionIndexes': [
                         1,
                         0,
@@ -39,7 +44,7 @@ class ObservationSetTestCase(unittest.TestCase):
                     'stringValue': 'A'
                 },
                 {
-                    'inlineDimensions': [],
+                    'inlineDimensions': ['inline_dim1 el2'],
                     'dimensionIndexes': [
                         0,
                         1,
@@ -71,6 +76,6 @@ class ObservationSetTestCase(unittest.TestCase):
 
         self.assertIsNotNone(df)
         pdt.assert_frame_equal(df, pd.DataFrame([
-            {'dim1.name': 'dim1 el2', 'dim2.name': 'dim2 el1', 'stringValue': 'A'},
-            {'dim1.name': 'dim1 el1', 'dim2.name': 'dim2 el2', 'numericValue': 25},
+            {'inline_dim1': 'inline_dim1 el1', 'dim1.name': 'dim1 el2', 'dim2.name': 'dim2 el1', 'stringValue': 'A'},
+            {'inline_dim1': 'inline_dim1 el2', 'dim1.name': 'dim1 el1', 'dim2.name': 'dim2 el2', 'numericValue': 25},
         ]))

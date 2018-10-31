@@ -11,7 +11,7 @@ def _format_observations(observations_result):
     inline_dimensions = []
 
     for dimension in observations_result['dimensionDeclarations']:
-        if 'inline' in dimension:
+        if 'inline' in dimension and dimension['inline']:
             inline_dimensions.append(dimension)
         else:
             indexed_dimensions.append(dimension)
