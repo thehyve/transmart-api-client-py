@@ -3,7 +3,7 @@ from .api.v2.api import TransmartV2
 
 
 def get_api(host, api_version=2, user=None, password=None, kc_url=None,
-            kc_realm=None, print_urls=False, interactive=True, **kwargs):
+            kc_realm=None, print_urls=False, interactive=True, client_id=None, **kwargs):
     """
     Create the python transmart client by providing user credentials.
 
@@ -15,6 +15,7 @@ def get_api(host, api_version=2, user=None, password=None, kc_url=None,
     :param kc_realm: Realm that is registered for the transmart api host to listen.
     :param print_urls: print the url of handles being used.
     :param interactive: automatically build caches for interactive use.
+    :param client_id: client id in keycloak.
     """
     api_versions = (1, 2)
 
@@ -30,4 +31,5 @@ def get_api(host, api_version=2, user=None, password=None, kc_url=None,
                kc_realm=kc_realm,
                print_urls=print_urls,
                interactive=interactive,
+               client_id=client_id,
                **kwargs)

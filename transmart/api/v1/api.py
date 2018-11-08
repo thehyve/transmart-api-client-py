@@ -30,7 +30,7 @@ class TransmartV1:
     """ Connect to tranSMART V1 api using Python. """
 
     def __init__(self, host, user=None, password=None, kc_url=None,
-                 kc_realm=None, print_urls=False, *args, **kwargs):
+                 kc_realm=None, client_id=None, print_urls=False, *args, **kwargs):
         """
         Create the python transmart client by providing user credentials.
 
@@ -39,11 +39,12 @@ class TransmartV1:
         :param password: if not given, it asks for it.
         :param kc_url: KeyCloak hostname (e.g. https://keycloak-test.thehyve.net).
         :param kc_realm: Realm that is registered for the transmart api host to listen.
+        :param client_id: client id in keycloak.
         :param print_urls: print the url of handles being used.
         """
         self.host = host
         self.print_urls = print_urls
-        self.auth = get_auth(host, user, password, kc_url, kc_realm)
+        self.auth = get_auth(host, user, password, kc_url, kc_realm, client_id)
 
     def get_observations(self, study=None, patientSet=None, as_dataframe=True, hal=False):
         """
