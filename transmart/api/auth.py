@@ -6,17 +6,18 @@ import time
 
 class Authenticator(metaclass=abc.ABCMeta):
 
-    def __init__(self, url, username=None, password=None, realm=None):
+    def __init__(self, url, username=None, password=None, realm=None, client_id=None):
         self.url = url
         self.user = username or input('Username: ')
         self.password = password
         self.realm = realm
+        self.client_id = client_id or self._default_client_id
         self._access_token = None
         self.get_token()
 
     @property
     @abc.abstractmethod
-    def client_id(self):
+    def _default_client_id(self) -> str:
         pass
 
     @property
@@ -34,7 +35,7 @@ class Authenticator(metaclass=abc.ABCMeta):
 
 
 class LegacyAuth(Authenticator):
-    client_id = 'glowingbear-js'
+    _default_client_id = 'glowingbear-js'
 
     @property
     def access_token(self):
@@ -62,7 +63,7 @@ class LegacyAuth(Authenticator):
 
 
 class KeyCloakAuth(Authenticator):
-    client_id = 'transmart-client'
+    _default_client_id = 'transmart-client'
 
     def __init__(self, *args, **kwargs):
         self.refresh_token = None
@@ -119,7 +120,7 @@ class KeyCloakAuth(Authenticator):
         self._access_token = r.json().get('access_token')
 
 
-def get_auth(host, user=None, password=None, kc_url=None, kc_realm=None) -> Authenticator:
+def get_auth(host, user=None, password=None, kc_url=None, kc_realm=None, client_id=None) -> Authenticator:
     """
     Returns appropriate authenticator depending on the provided parameter.
     If kc_url is provided returns the KeyCloakAuth, else LegacyAuth.
@@ -129,6 +130,7 @@ def get_auth(host, user=None, password=None, kc_url=None, kc_realm=None) -> Auth
     :param password: password for authentication, will be asked if not provided.
     :param kc_url: KeyCloak hostname (e.g. https://keycloak-test.thehyve.net)
     :param kc_realm: Realm that is registered for the transmart api host to listen.
+    :param client_id: client id in keycloak.
     :return: Authenticator
     """
 
@@ -137,6 +139,6 @@ def get_auth(host, user=None, password=None, kc_url=None, kc_realm=None) -> Auth
                             realm=kc_realm,
                             username=user,
                             password=password,
-                            )
+                            client_id=client_id)
     else:
-        return LegacyAuth(host, user, password)
+        return LegacyAuth(host, user, password, client_id)

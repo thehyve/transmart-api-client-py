@@ -65,7 +65,7 @@ class Query:
 class TransmartV2:
     """ Connect to tranSMART v2 API using Python. """
 
-    def __init__(self, host, user=None, password=None, kc_url=None, kc_realm=None, print_urls=False, interactive=True):
+    def __init__(self, host, user=None, password=None, kc_url=None, kc_realm=None, client_id=None, print_urls=False, interactive=True):
         """
         Create the python transmart client by providing user credentials.
 
@@ -76,6 +76,7 @@ class TransmartV2:
         :param kc_realm: Realm that is registered for the transmart api host to listen.
         :param print_urls: print the url of handles being used.
         :param interactive: automatically build caches for interactive use.
+        :param client_id: client id in keycloak.
         """
         self.studies = None
         self.tree_dict = None
@@ -85,7 +86,7 @@ class TransmartV2:
         self.interactive = interactive
         self.print_urls = print_urls
 
-        self.auth = get_auth(host, user, password, kc_url, kc_realm)
+        self.auth = get_auth(host, user, password, kc_url, kc_realm, client_id)
 
         self._admin_call_factory('/v2/admin/system/after_data_loading_update')
         self._admin_call_factory('/v2/admin/system/config')
