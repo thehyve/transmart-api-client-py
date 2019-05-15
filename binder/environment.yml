@@ -3,7 +3,7 @@ channels:
 dependencies:
 - jupyterlab
 - nodejs
-- widgetsnbextension=
+- widgetsnbextension
 - bqplot
 - matplotlib
 - pandas
@@ -16,3 +16,4 @@ dependencies:
 - requests
 - whoosh
 - arrow
+- bokeh
