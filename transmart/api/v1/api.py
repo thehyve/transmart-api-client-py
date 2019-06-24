@@ -30,7 +30,7 @@ class TransmartV1:
     """ Connect to tranSMART V1 api using Python. """
 
     def __init__(self, host, user=None, password=None, kc_url=None,
-                 kc_realm=None, client_id=None, print_urls=False, *args, **kwargs):
+                 kc_realm=None, client_id=None, print_urls=False, verify=None, *args, **kwargs):
         """
         Create the python transmart client by providing user credentials.
 
@@ -41,9 +41,13 @@ class TransmartV1:
         :param kc_realm: Realm that is registered for the transmart api host to listen.
         :param client_id: client id in keycloak.
         :param print_urls: print the url of handles being used.
+        :param verify: Either a boolean, in which case it controls whether we verify
+        the server’s TLS certificate, or a string, in which case it must be a path
+        to a CA bundle to use. Defaults to True.
         """
         self.host = host
         self.print_urls = print_urls
+        self.verify = verify
         self.auth = get_auth(host, user, password, kc_url, kc_realm, client_id)
 
     def get_observations(self, study=None, patientSet=None, as_dataframe=True, hal=False):
@@ -134,7 +138,7 @@ class TransmartV1:
         headers['Accept'] = 'application/%s;charset=UTF-8' % ('hal+json' if hal else 'json')
         if self.auth.access_token is not None:
             headers['Authorization'] = 'Bearer ' + self.auth.access_token
-        r = requests.post(url, headers=headers)
+        r = requests.post(url, headers=headers, verify=self.verify)
         r.raise_for_status()
         return r.json()
 
@@ -149,7 +153,7 @@ class TransmartV1:
         if self.auth.access_token is not None:
             headers['Authorization'] = 'Bearer ' + self.auth.access_token
 
-        r = requests.get(url, headers=headers)
+        r = requests.get(url, headers=headers, verify=self.verify)
         r.raise_for_status()
         return r.json()
 
