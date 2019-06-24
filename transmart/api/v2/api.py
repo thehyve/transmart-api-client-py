@@ -4,14 +4,14 @@
 * version 3.
 """
 
-import transmart
-
 import logging
 from functools import wraps
 from json import JSONDecodeError
 from urllib.parse import unquote_plus
 
 import requests
+
+import transmart
 from ..auth import get_auth
 
 if transmart.dependency_mode == 'FULL':
@@ -65,7 +65,8 @@ class Query:
 class TransmartV2:
     """ Connect to tranSMART v2 API using Python. """
 
-    def __init__(self, host, user=None, password=None, kc_url=None, kc_realm=None, client_id=None, print_urls=False, interactive=True):
+    def __init__(self, host, user=None, password=None, kc_url=None, kc_realm=None,
+                 client_id=None, print_urls=False, interactive=True, verify=None):
         """
         Create the python transmart client by providing user credentials.
 
@@ -77,6 +78,9 @@ class TransmartV2:
         :param print_urls: print the url of handles being used.
         :param interactive: automatically build caches for interactive use.
         :param client_id: client id in keycloak.
+        :param verify: Either a boolean, in which case it controls whether we verify
+        the server’s TLS certificate, or a string, in which case it must be a path
+        to a CA bundle to use. Defaults to True.
         """
         self.studies = None
         self.tree_dict = None
@@ -85,6 +89,7 @@ class TransmartV2:
         self.host = host
         self.interactive = interactive
         self.print_urls = print_urls
+        self.verify = verify
 
         self.auth = get_auth(host, user, password, kc_url, kc_realm, client_id)
 
@@ -123,9 +128,9 @@ class TransmartV2:
         headers['Authorization'] = 'Bearer ' + self.auth.access_token
 
         if q.method.upper() == 'GET':
-            r = requests.get(url, params=q.params, headers=headers)
+            r = requests.get(url, params=q.params, headers=headers, verify=self.verify)
         else:
-            r = requests.post(url, json=q.json, params=q.params, headers=headers)
+            r = requests.post(url, json=q.json, params=q.params, headers=headers, verify=self.verify)
 
         if self.print_urls:
             print(unquote_plus(r.url))
