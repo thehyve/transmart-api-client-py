@@ -29,14 +29,13 @@ if transmart.dependency_mode == 'FULL':
 class TransmartV1:
     """ Connect to tranSMART V1 api using Python. """
 
-    def __init__(self, host, user=None, password=None, kc_url=None,
+    def __init__(self, host, offline_token=None, kc_url=None,
                  kc_realm=None, client_id=None, print_urls=False, verify=None, *args, **kwargs):
         """
         Create the python transmart client by providing user credentials.
 
         :param host: a transmart URL (e.g. http://transmart-test.thehyve.net)
-        :param user: if not given, it asks for it.
-        :param password: if not given, it asks for it.
+        :param offline_token: if not given, it asks for it.
         :param kc_url: KeyCloak hostname (e.g. https://keycloak-test.thehyve.net).
         :param kc_realm: Realm that is registered for the transmart api host to listen.
         :param client_id: client id in keycloak.
@@ -48,7 +47,7 @@ class TransmartV1:
         self.host = host
         self.print_urls = print_urls
         self.verify = verify
-        self.auth = get_auth(host, user, password, kc_url, kc_realm, client_id)
+        self.auth = get_auth(host, offline_token, kc_url, kc_realm, client_id)
 
     def get_observations(self, study=None, patientSet=None, as_dataframe=True, hal=False):
         """

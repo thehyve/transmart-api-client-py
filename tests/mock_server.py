@@ -65,14 +65,17 @@ def retry(func):
 
 
 class TestMockServer(unittest.TestCase):
-
+    """
+    Server that mocks both tranSMART and Keycloak.
+    To simplify testing, it assumes tranSMART and Keycloak have the same URL, so only one mock server is required.
+    """
     interactive = False
     version = 2
 
     @classmethod
     def setUpClass(cls):
         cls.host = 'localhost'
-        user = password = 'george'
+        offline_token = 'offline token'
 
         cls.mock_server_port = get_free_port()
         # Configure mock server.
@@ -86,8 +89,10 @@ class TestMockServer(unittest.TestCase):
 
         time.sleep(2)
         start = lambda: get_api(host='http://{}:{}'.format(cls.host, cls.mock_server_port),
-                                user=user,
-                                password=password,
+                                kc_url='http://{}:{}'.format(cls.host, cls.mock_server_port),
+                                kc_realm='test',
+                                client_id='test',
+                                offline_token=offline_token,
                                 interactive=cls.interactive,
                                 api_version=cls.version)
         cls.api = retry(start)()

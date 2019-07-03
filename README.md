@@ -32,15 +32,14 @@ $ transmart-keycloak --help
 Usage: transmart-keycloak [OPTIONS]
 
 Options:
-  -t, --transmart TEXT  tranSMART host url, e.g. https://transmart-
-                        dev.thehyve.net.  [required]
-  -k, --kc-url TEXT     KeyCloak host, e.g. https://keycloak-dwh-
-                        test.thehyve.net.  [required]
-  -r, --realm TEXT      KeyCloak realm.  [required]
-  -u, --user TEXT       KeyCloak username.
-  -p, --password TEXT   KeyCloak password, will be asked for if not provided.
-  -s, --study TEXT      Add roles for this study IDs. If not provided, add all
-                        studies.
-  --version             Show the version and exit.
-  --help                Show this message and exit.
+  -t, --transmart TEXT      tranSMART host url, e.g. https://transmart-
+                            dev.thehyve.net.  [required]
+  -k, --kc-url TEXT         KeyCloak host, e.g. https://keycloak-dwh-
+                            test.thehyve.net.  [required]
+  -r, --realm TEXT          KeyCloak realm.  [required]
+  -o, --offline-token TEXT  KeyCloak offline token, will be asked for if not provided.
+  -s, --study TEXT          Add roles for this study IDs. If not provided, add all
+                            studies.
+  --version                 Show the version and exit.
+  --help                    Show this message and exit.
 ```

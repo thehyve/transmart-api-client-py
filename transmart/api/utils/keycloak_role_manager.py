@@ -13,7 +13,8 @@ class KeyCloakRoleManagerException(Exception):
 
 class KeyCloakRoleManager:
     """
-    The logged in user requires 'ROLE_ADMIN' in transmart-api client in KeyCloak to see all studies.
+    The user for whom an offline token was generated requires 'ROLE_ADMIN'
+    in transmart-api client in KeyCloak to see all studies.
 
     Also required for this user is the 'manage-clients' role in the 'realm-management' client
     to find the guid corresponding to transmart-api client and add roles.
@@ -26,14 +27,12 @@ class KeyCloakRoleManager:
         kc_url = "https://keycloak-dwh-test.thehyve.net"
         kc_realm = "transmart-dev"
 
-        user = 'boris'
-        password = None
+        offline_token = None
 
         api = tm.get_api(
             host = host,
             api_version = 2,
-            user = user,
-            password = password,
+            offline_token = offline_token,
             kc_url=kc_url,
             kc_realm=kc_realm,
             print_urls = True,
@@ -137,14 +136,13 @@ class KeyCloakRoleManager:
             self.add_single_study_roles(study)
 
 
-def run_role_manager(transmart, kc_url, realm, user=None, password=None, study=None):
+def run_role_manager(transmart, kc_url, realm, offline_token=None, study=None):
     import transmart as tm
 
     api = tm.get_api(
         host=transmart,
         api_version=2,
-        user=user,
-        password=password,
+        offline_token=offline_token,
         kc_url=kc_url,
         kc_realm=realm,
         print_urls=True,
@@ -164,9 +162,7 @@ def run_role_manager(transmart, kc_url, realm, user=None, password=None, study=N
 @click.option('-k', '--kc-url', required=True,
               help='KeyCloak host, e.g. https://keycloak-dwh-test.thehyve.net.')
 @click.option('-r', '--realm', help='KeyCloak realm.', required=True)
-@click.option('-u', '--user', help='KeyCloak username.')
-@click.option('-p', '--password', default=None,
-              help='KeyCloak password, will be asked for if not provided.')
+@click.option('-o', '--offline-token', help='KeyCloak offline token, will be asked for if not provided.')
 @click.option('-s', '--study', default=None,
               help='Add roles for this study IDs. If not provided, add all studies.')
 @click.version_option(prog_name="Add roles from tranSMART to KeyCloak.")
