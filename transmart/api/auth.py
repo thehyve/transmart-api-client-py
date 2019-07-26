@@ -1,15 +1,13 @@
 import abc
 import requests
 from getpass import getpass
-import time
 
 
 class Authenticator(metaclass=abc.ABCMeta):
 
-    def __init__(self, url, username=None, password=None, realm=None, client_id=None):
+    def __init__(self, url, offline_token=None, realm=None, client_id=None):
         self.url = url
-        self.user = username or input('Username: ')
-        self.password = password
+        self.offline_token = offline_token
         self.realm = realm
         self.client_id = client_id or self._default_client_id
         self._access_token = None
@@ -39,18 +37,19 @@ class LegacyAuth(Authenticator):
 
     @property
     def access_token(self):
-        return self._access_token
+        return self.get_token
 
     def get_token(self):
+        user = input('Username: ')
         r = requests.post(
             "{}/oauth/token".format(self.url),
             params=dict(
                 grant_type='password',
                 client_id=self.client_id,
-                username=self.user
+                username=user
             ),
             data=dict(
-                password=self.password or getpass("tranSMART password: ")
+                password=getpass("tranSMART password: ")
             )
         )
 
@@ -66,8 +65,6 @@ class KeyCloakAuth(Authenticator):
     _default_client_id = 'transmart-client'
 
     def __init__(self, *args, **kwargs):
-        self.refresh_token = None
-        self.timeout = None
         super().__init__(*args, **kwargs)
 
     @property
@@ -76,58 +73,39 @@ class KeyCloakAuth(Authenticator):
 
     @property
     def access_token(self):
-        if self.timeout is not None and time.time() > self.timeout:
-            self.refresh()
+        if not self._access_token:
+            self.get_token()
 
         return self._access_token
 
     def get_token(self):
-        r = requests.post(
-            url=self.handle,
-            data=dict(
-                grant_type='password',
-                client_id=self.client_id,
-                username=self.user,
-                password=self.password or getpass("KeyCloak password: ")
-            )
-        )
-
-        r.raise_for_status()
-
-        if r.json().get('expires_in'):
-            self.timeout = time.time() + r.json().get('expires_in')
-
-        self.refresh_token = r.json().get('refresh_token')
-        self._access_token = r.json().get('access_token')
-
-    def refresh(self):
+        offline_token = self.offline_token or input('Offline token: ')
         r = requests.post(
             url=self.handle,
             data=dict(
                 grant_type='refresh_token',
-                refresh_token=self.refresh_token,
-                client_id=self.client_id
+                refresh_token=offline_token,
+                client_id=self.client_id,
+                scope='offline_access',
             )
         )
 
-        if r.json().get('error') == 'invalid_grant':
-            self.get_token()
-            return
-
-        if r.json().get('expires_in'):
-            self.timeout = time.time() + r.json().get('expires_in')
+        if not r.ok:
+            r.raise_for_status()
 
         self._access_token = r.json().get('access_token')
 
+    def refresh(self):
+        self.get_token()
 
-def get_auth(host, user=None, password=None, kc_url=None, kc_realm=None, client_id=None) -> Authenticator:
+
+def get_auth(host, offline_token=None, kc_url=None, kc_realm=None, client_id=None) -> Authenticator:
     """
     Returns appropriate authenticator depending on the provided parameter.
     If kc_url is provided returns the KeyCloakAuth, else LegacyAuth.
 
     :param host: transmart api host.
-    :param user: username for authentication, will be asked if not provided.
-    :param password: password for authentication, will be asked if not provided.
+    :param offline_token: offline_token for authentication, will be asked if not provided.
     :param kc_url: KeyCloak hostname (e.g. https://keycloak-test.thehyve.net)
     :param kc_realm: Realm that is registered for the transmart api host to listen.
     :param client_id: client id in keycloak.
@@ -137,8 +115,7 @@ def get_auth(host, user=None, password=None, kc_url=None, kc_realm=None, client_
     if kc_url:
         return KeyCloakAuth(url=kc_url,
                             realm=kc_realm,
-                            username=user,
-                            password=password,
+                            offline_token=offline_token,
                             client_id=client_id)
     else:
-        return LegacyAuth(host, user, password, client_id)
+        return LegacyAuth(host, client_id)
