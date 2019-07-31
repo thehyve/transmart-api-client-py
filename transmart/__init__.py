@@ -47,5 +47,5 @@ del (minimal, backend, full, _hard, missing_dependencies,
 from .main import get_api
 
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 __author__ = 'The Hyve'
