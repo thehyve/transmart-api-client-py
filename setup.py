@@ -21,16 +21,14 @@ if os.environ.get('READTHEDOCS') == 'True':
             if package.startswith(dependency):
                 required_packages.remove(package)
 
-minimal = ["requests", "click"]
+minimal = ["requests", "click", "pyjwt"]
 backend = ["pandas", "arrow"]
 
 setuptools.setup(
     name="transmart",
     version=version_string,
-    url="https://www.github.com/thehyve/transmart-api-client-py/",
-
-    maintainer="developers@thehyve.nl",
-    maintainer_email="developers@thehyve.nl",
+    url="https://github.com/thehyve/transmart-api-client-py",
+    author="The Hyve",
 
     description="An python client for communicating with the transmart rest api.",
 
@@ -58,5 +56,6 @@ setuptools.setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7'
     ],
 )
