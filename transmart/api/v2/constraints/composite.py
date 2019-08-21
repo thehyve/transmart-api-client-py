@@ -142,6 +142,13 @@ class GroupConstraint(Queryable):
             else:
                 return GroupConstraint([self, other], my_type)
 
+    def subselect(self, dimension='patient'):
+        return {
+            'type': 'subselection',
+            'dimension': dimension,
+            'constraint': self.json()
+        }
+
     def json(self):
         return {
             'type': self.group_type,
