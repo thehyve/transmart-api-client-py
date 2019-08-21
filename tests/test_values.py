@@ -1,11 +1,15 @@
+import jwt
+
+access_token = jwt.encode({'sub': '54604e3b-4d6a-419d-9173-4b1af0530bfb'}, 'secret', algorithm='HS256').decode('UTF-8')
+
 POST_JSON_RESPONSES = {
     '/oauth/token':  {
-        'access_token': '54604e3b-4d6a-419d-9173-4b1af0530bfb',
+        'access_token': access_token,
         'token_type': 'bearer',
         'expires_in': 42695,
         'scope': 'read write'},
     '/auth/realms/test/protocol/openid-connect/token':  {
-        'access_token': '54604e3b-4d6a-419d-9173-4b1af0530bfb',
+        'access_token': access_token,
         'token_type': 'bearer',
         'expires_in': 42695,
         'scope': 'read write'},

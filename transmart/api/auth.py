@@ -1,5 +1,7 @@
 import abc
+import jwt
 import requests
+import time
 from getpass import getpass
 
 
@@ -66,6 +68,7 @@ class KeyCloakAuth(Authenticator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.expiry = None
 
     @property
     def handle(self):
@@ -73,10 +76,17 @@ class KeyCloakAuth(Authenticator):
 
     @property
     def access_token(self):
-        if not self._access_token:
+        if not self.has_valid_token():
             self.get_token()
 
         return self._access_token
+
+    def has_valid_token(self):
+        if self._access_token is None:
+            return False
+        if self.expiry is not None and self.expiry > time.time() + 10:
+            return True
+        return False
 
     def get_token(self):
         offline_token = self.offline_token or input('Offline token: ')
@@ -94,6 +104,8 @@ class KeyCloakAuth(Authenticator):
             r.raise_for_status()
 
         self._access_token = r.json().get('access_token')
+        contents = jwt.decode(self._access_token, verify=False)
+        self.expiry = contents.get('exp', None)
 
     def refresh(self):
         self.get_token()
