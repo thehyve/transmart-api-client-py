@@ -75,7 +75,7 @@ class ObservationSetTestCase(unittest.TestCase):
         df = ObservationSet(observations_api_response).dataframe
 
         self.assertIsNotNone(df)
-        pdt.assert_frame_equal(df, pd.DataFrame([
+        pdt.assert_frame_equal(df.sort_index(axis=1), pd.DataFrame([
             {'inline_dim1': 'inline_dim1 el1', 'dim1.name': 'dim1 el2', 'dim2.name': 'dim2 el1', 'stringValue': 'A'},
             {'inline_dim1': 'inline_dim1 el2', 'dim1.name': 'dim1 el1', 'dim2.name': 'dim2 el2', 'numericValue': 25},
-        ]))
+        ]).sort_index(axis=1))
