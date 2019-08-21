@@ -136,26 +136,23 @@ class TreeNodes:
         for child in root.get('children', {}):
             s += "\n%s" % self.pretty(child, depth + 1, spacing)
         return s
-    
-    def create_list(self, root=None):
-        """
-        Create dataframe representation of tree.
-        """
-        
-        if root is None:
-            top_nodes = []
-            for root in self.json.get('tree_nodes'):
-                top_nodes += self.create_list(root)
-            return top_nodes
 
-        thisnode = root.copy()
-        thisnode.pop("children", None)
-        s = [thisnode]
+    def flatten_tree(self, nodes):
+        node_list = []
+        for node in nodes:
+            node_copy = node.copy()
+            node_copy.pop('children', None)
+            node_list.append(node_copy)
+            children = node.get('children', None)
+            if children is not None:
+                node_list += self.flatten_tree(children)
+        return node_list
 
-        for child in root.get('children', {}):
-            s += self.create_list(child)
-        
-        return s
+    def create_list(self):
+        """
+        Create list representation of tree.
+        """
+        return self.flatten_tree(self.json.get('tree_nodes', []))
 
 
 class Patients:
