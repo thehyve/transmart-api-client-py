@@ -136,7 +136,16 @@ class ValueListConstraint(ValueConstraint):
     operator = '='
 
     def json(self):
-        return {'type': 'or',
+        if len(self.value) == 1:
+            return {
+                'type': 'value',
+                'valueType': self.value_type_,
+                'operator': self.operator,
+                'value': self.value[0]
+            }
+        else:
+            return {
+                'type': 'or',
                 'args': [
                     {'type': 'value',
                      'valueType': self.value_type_,

@@ -127,20 +127,24 @@ class GroupConstraint(Queryable):
 
         if isinstance(other, Grouper):
             if self.group_type == my_type:
-                self.items.append(other)
-                return self
+                return GroupConstraint(self.items.copy() + [other], my_type)
             else:
                 return GroupConstraint([self, other], my_type)
 
         elif isinstance(other, self.__class__):
             if other.group_type == my_type:
-                other.items += self.items
-                return other
+                return GroupConstraint(other.items.copy() + [self], my_type)
             if other.group_type == not_my_type and self.group_type == my_type:
-                self.items.append(other)
-                return self
+                return GroupConstraint(self.items.copy() + [other], my_type)
             else:
                 return GroupConstraint([self, other], my_type)
+
+    def subselect(self, dimension='patient'):
+        return {
+            'type': 'subselection',
+            'dimension': dimension,
+            'constraint': self.json()
+        }
 
     def json(self):
         return {

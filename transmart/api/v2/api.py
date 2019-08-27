@@ -6,6 +6,7 @@
 
 import logging
 from functools import wraps
+import json
 from json import JSONDecodeError
 from urllib.parse import unquote_plus
 
@@ -45,6 +46,18 @@ def add_to_queryable(func):
     """
     func.__query_method__ = True
     return func
+
+
+def constraint_to_dict(constraint):
+    """
+    Tries to convert the object to a dictionary using its
+    json() method if it exists.
+    Otherwise, it assumes that already is a dictionary and return it as is.
+    """
+    try:
+        return constraint.json()
+    except AttributeError:
+        return constraint
 
 
 class Query:
@@ -134,7 +147,11 @@ class TransmartV2:
         if self.print_urls:
             print(unquote_plus(r.url))
 
-        return r.json()
+        if r.status_code == 200 or r.status_code == 201:
+            return r.json()
+        else:
+            logger.error(json.dumps(r.json(), indent=2))
+            raise Exception('Error retrieving data')
 
     def admin(self):
         """
@@ -165,10 +182,11 @@ class TransmartV2:
         :return: dataframe or direct json
         """
         q = Query(handle='/v2/observations',
-                  params=dict(
-                      type='clinical',
-                      constraint=str(constraint))
-                  )
+                  method='POST',
+                  json={
+                      'type': 'clinical',
+                      'constraint': constraint_to_dict(constraint)
+                  })
 
         observations = ObservationSet(self.query(q))
 
@@ -182,8 +200,9 @@ class TransmartV2:
         def func(constraint=None, *args, **kwargs):
             q = Query(handle='/v2/observations/' + handle,
                       method='POST',
-                      json={'constraint': constraint.json()}
-                      )
+                      json={
+                          'constraint': constraint_to_dict(constraint)
+                      })
             return self.query(q)
 
         func.__doc__ = doc
@@ -199,7 +218,11 @@ class TransmartV2:
            are added to the constraint.
         :return: dataframe or direct json
         """
-        q = Query(handle='/v2/patients', method='POST', json={'constraint': constraint.json()})
+        q = Query(handle='/v2/patients',
+                  method='POST',
+                  json={
+                      'constraint': constraint_to_dict(constraint)
+                  })
         return Patients(self.query(q))
 
     def patient_sets(self, patient_set_id=None):
@@ -223,7 +246,7 @@ class TransmartV2:
         q = Query(handle='/v2/patient_sets',
                   method="POST",
                   params={"name": name},
-                  json=constraint.json()
+                  json=constraint_to_dict(constraint)
                   )
 
         return self.query(q)
