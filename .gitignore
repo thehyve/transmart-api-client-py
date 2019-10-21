@@ -5,6 +5,9 @@
 __pycache__/
 build/
 dist/
+venv/
+.eggs/
 transmart.egg-info/
 transmart/__pycache__/
 !examples/*
+examples/.ipynb_checkpoints
