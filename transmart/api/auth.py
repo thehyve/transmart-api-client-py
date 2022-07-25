@@ -104,7 +104,7 @@ class KeyCloakAuth(Authenticator):
             r.raise_for_status()
 
         self._access_token = r.json().get('access_token')
-        contents = jwt.decode(self._access_token, verify=False)
+        contents = jwt.decode(self._access_token, options={'verify_signature': False})
         self.expiry = contents.get('exp', None)
 
     def refresh(self):

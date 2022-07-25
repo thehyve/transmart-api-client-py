@@ -1,6 +1,6 @@
 import jwt
 
-access_token = jwt.encode({'sub': '54604e3b-4d6a-419d-9173-4b1af0530bfb'}, 'secret', algorithm='HS256').decode('UTF-8')
+access_token = jwt.encode({'sub': '54604e3b-4d6a-419d-9173-4b1af0530bfb'}, 'secret', algorithm='HS256')
 
 POST_JSON_RESPONSES = {
     '/oauth/token':  {
