@@ -8,3 +8,4 @@ IPython
 bqplot
 click
 pyjwt
+importlib-metadata>=4.12.0
